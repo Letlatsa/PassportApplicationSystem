@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
 import PersonalInfoStep from '../components/application/PersonalInfoStep';
 import DocumentsStep from '../components/application/DocumentsStep';
+import PaymentStep from '../components/application/PaymentStep';
 import ReviewStep from '../components/application/ReviewStep';
 import { useAuth } from '../contexts/AuthContext';
 import { useApplications } from '../contexts/ApplicationContext';
@@ -22,6 +23,7 @@ export interface ApplicationFormData {
   idDocument: File | null;
   birthCertificate: File | null;
   proofOfAddress: File | null;
+  proofOfPayment: File | null;
 }
 
 export default function Apply() {
@@ -46,12 +48,14 @@ export default function Apply() {
     idDocument: null,
     birthCertificate: null,
     proofOfAddress: null
+    proofOfPayment: null
   });
 
   const steps = [
     { number: 1, title: 'Personal Information', component: PersonalInfoStep },
     { number: 2, title: 'Documents', component: DocumentsStep },
-    { number: 3, title: 'Review & Submit', component: ReviewStep }
+    { number: 3, title: 'Payment', component: PaymentStep },
+    { number: 4, title: 'Review & Submit', component: ReviewStep }
   ];
 
   const nextStep = () => {
@@ -92,6 +96,7 @@ export default function Apply() {
         id_document_url: formData.idDocument ? 'uploaded' : null,
         birth_certificate_url: formData.birthCertificate ? 'uploaded' : null,
         proof_of_address_url: formData.proofOfAddress ? 'uploaded' : null,
+        proof_of_payment_url: formData.proofOfPayment ? 'uploaded' : null,
         status: 'submitted' as const,
         collection_point_id: null,
         qr_code: null

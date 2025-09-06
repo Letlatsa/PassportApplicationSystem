@@ -19,7 +19,7 @@ export default function DocumentsStep({ formData, updateFormData, onNext, onPrev
 
   const validateAndNext = () => {
     // Check if all required documents are uploaded
-    const requiredDocs = ['passportPhoto', 'idDocument', 'birthCertificate', 'proofOfAddress'];
+    const requiredDocs = ['passportPhoto', 'idDocument', 'proofOfAddress'];
     const missingDocs = requiredDocs.filter(doc => !formData[doc as keyof ApplicationFormData]);
     
     if (missingDocs.length > 0) {
@@ -38,21 +38,15 @@ export default function DocumentsStep({ formData, updateFormData, onNext, onPrev
       required: true
     },
     {
-      key: 'idDocument' as keyof ApplicationFormData,
-      title: 'National ID',
-      description: 'Clear scan or photo of your national identity document',
+      key: 'idDocument' as keyof ApplicationFormData, 
+      title: 'National ID OR Birth Certificate',
+      description: 'Certified copy of National ID or Birth Certificate (choose one)',
       required: true
     },
     {
-      key: 'birthCertificate' as keyof ApplicationFormData,
-      title: 'Birth Certificate',
-      description: 'Official birth certificate (certified copy acceptable)',
-      required: true
-    },
-    {
-      key: 'proofOfAddress' as keyof ApplicationFormData,
-      title: 'Proof of Address',
-      description: 'Utility bill, bank statement, or official letter (within last 3 months)',
+      key: 'proofOfAddress' as keyof ApplicationFormData, 
+      title: 'Village Chief Letter',
+      description: 'Letter from village chief as proof of residence',
       required: true
     }
   ];
@@ -153,9 +147,11 @@ export default function DocumentsStep({ formData, updateFormData, onNext, onPrev
             <p className="font-semibold mb-1">Document Requirements:</p>
             <ul className="text-xs space-y-1">
               <li>• All documents must be clear and readable</li>
+              <li>• ID or Birth Certificate must be certified copies</li>
               <li>• Photos must have white background</li>
               <li>• Scans should be in color and high resolution</li>
               <li>• File formats: JPEG, PNG, PDF only</li>
+              <li>• Village chief letter must be official and signed</li>
             </ul>
           </div>
         </div>

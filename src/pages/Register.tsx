@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { Shield, Eye, EyeOff, User } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import CoatOfArms from '../CoatOfArms.png';
 
 interface RegisterForm {
   email: string;
@@ -20,6 +21,7 @@ export default function Register() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
 
   const {
     register,
@@ -49,7 +51,7 @@ export default function Register() {
       if (error) {
         setError(error.message);
       } else {
-        navigate('/dashboard');
+        setSuccess(true);
       }
     } catch (err) {
       setError('Registration failed. Please try again.');
@@ -63,7 +65,11 @@ export default function Register() {
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <div className="flex justify-center mb-6">
-            <Shield className="h-12 w-12 text-blue-600" />
+            <img 
+              src={CoatOfArms} 
+              alt="Coat of Arms" 
+              className="h-16 w-auto"
+            />
           </div>
           <h2 className="text-3xl font-bold text-gray-900 mb-2">Create Account</h2>
           <p className="text-gray-600">
@@ -71,6 +77,25 @@ export default function Register() {
           </p>
         </div>
 
+        {success ? (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
+            <div className="flex justify-center mb-4">
+              <div className="bg-green-100 p-3 rounded-full">
+                <User className="w-8 h-8 text-green-600" />
+              </div>
+            </div>
+            <h3 className="text-lg font-semibold text-green-800 mb-2">Account Created Successfully!</h3>
+            <p className="text-green-700 mb-4">
+              Please check your email to verify your account before signing in.
+            </p>
+            <Link
+              to="/login"
+              className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors"
+            >
+              Go to Sign In
+            </Link>
+          </div>
+        ) : (
         <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm">
@@ -227,6 +252,7 @@ export default function Register() {
             </p>
           </div>
         </form>
+        )}
       </div>
     </div>
   );

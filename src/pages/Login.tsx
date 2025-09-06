@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { Shield, Eye, EyeOff, LogIn } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import CoatOfArms from '../CoatOfArms.png';
 
 interface LoginForm {
   email: string;
@@ -46,7 +47,11 @@ export default function Login() {
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <div className="flex justify-center mb-6">
-            <Shield className="h-12 w-12 text-blue-600" />
+            <img 
+              src={CoatOfArms} 
+              alt="Coat of Arms" 
+              className="h-16 w-auto"
+            />
           </div>
           <h2 className="text-3xl font-bold text-gray-900 mb-2">Welcome Back</h2>
           <p className="text-gray-600">
@@ -130,15 +135,6 @@ export default function Login() {
             </p>
           </div>
         </form>
-
-        {/* Demo Accounts Info */}
-        <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-          <h3 className="text-sm font-semibold text-blue-800 mb-2">Demo Accounts</h3>
-          <div className="text-xs text-blue-700 space-y-1">
-            <p><strong>Admin:</strong> admin@lesotho.gov (password: admin123)</p>
-            <p><strong>User:</strong> user@example.com (password: user123)</p>
-          </div>
-        </div>
       </div>
     </div>
   );

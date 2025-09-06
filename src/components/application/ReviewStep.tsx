@@ -29,9 +29,9 @@ export default function ReviewStep({ formData, onPrev, onSubmit, isSubmitting }:
 
   const documents = [
     { label: 'Passport Photo', file: formData.passportPhoto },
-    { label: 'National ID', file: formData.idDocument },
-    { label: 'Birth Certificate', file: formData.birthCertificate },
-    { label: 'Proof of Address', file: formData.proofOfAddress }
+    { label: 'National ID or Birth Certificate', file: formData.idDocument },
+    { label: 'Village Chief Letter', file: formData.proofOfAddress },
+    { label: 'Proof of Payment', file: formData.proofOfPayment }
   ];
 
   return (
@@ -98,7 +98,7 @@ export default function ReviewStep({ formData, onPrev, onSubmit, isSubmitting }:
               <p className="font-semibold mb-2">Important Information:</p>
               <ul className="space-y-1 text-xs">
                 <li>• Processing time: 10-15 business days</li>
-                <li>• Application fee: M 350 (payable at collection)</li>
+                <li>• Application fee: M 350 (payment verified)</li>
                 <li>• You will receive SMS and email updates</li>
                 <li>• Ensure all information is accurate to avoid delays</li>
                 <li>• You can track your application status in your dashboard</li>
