@@ -108,6 +108,19 @@ export default function Apply() {
         throw error;
       }
 
+      // Send confirmation email
+      await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-confirmation-email`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          name: `${formData.firstName} ${formData.lastName}`,
+          reference_number: refNumber
+        })
+      });
       navigate('/dashboard');
     } catch (error) {
       console.error('Error submitting application:', error);
@@ -120,9 +133,9 @@ export default function Apply() {
   const CurrentStepComponent = steps[currentStep - 1].component;
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-screen">
       {/* Progress Bar */}
-      <div className="mb-8">
+      <div className="mb-8 bg-white/90 backdrop-blur-sm rounded-lg p-6">
         <div className="flex items-center justify-between mb-4">
           {steps.map((step, index) => (
             <div key={step.number} className="flex-1 flex items-center">
@@ -160,7 +173,7 @@ export default function Apply() {
       </div>
 
       {/* Current Step */}
-      <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
+      <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-6 mb-8">
         <CurrentStepComponent
           formData={formData}
           updateFormData={setFormData}

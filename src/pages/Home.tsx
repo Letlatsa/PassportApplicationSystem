@@ -7,10 +7,10 @@ export default function Home() {
   const { user } = useAuth();
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-white/10 backdrop-blur-sm">
       {/* Hero Section */}
       <div className="relative bg-gradient-to-r from-blue-600 via-blue-700 to-green-600 text-white pt-24 pb-16">
-        <div className="absolute inset-0 bg-black opacity-20"></div>
+        <div className="absolute inset-0 bg-black/30"></div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="text-center">
             <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
@@ -51,7 +51,7 @@ export default function Home() {
       </div>
 
       {/* Features Section */}
-      <div className="py-20 bg-white">
+      <div className="py-20 bg-white/80 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
@@ -63,7 +63,7 @@ export default function Home() {
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <div className="bg-gray-50 p-8 rounded-xl hover:shadow-lg transition-shadow">
+            <div className="bg-white/70 backdrop-blur-sm p-8 rounded-xl hover:shadow-lg transition-shadow">
               <div className="bg-blue-100 w-12 h-12 rounded-lg flex items-center justify-center mb-6">
                 <Clock className="w-6 h-6 text-blue-600" />
               </div>
@@ -73,7 +73,7 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="bg-gray-50 p-8 rounded-xl hover:shadow-lg transition-shadow">
+            <div className="bg-white/70 backdrop-blur-sm p-8 rounded-xl hover:shadow-lg transition-shadow">
               <div className="bg-green-100 w-12 h-12 rounded-lg flex items-center justify-center mb-6">
                 <MapPin className="w-6 h-6 text-green-600" />
               </div>
@@ -83,7 +83,7 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="bg-gray-50 p-8 rounded-xl hover:shadow-lg transition-shadow">
+            <div className="bg-white/70 backdrop-blur-sm p-8 rounded-xl hover:shadow-lg transition-shadow">
               <div className="bg-purple-100 w-12 h-12 rounded-lg flex items-center justify-center mb-6">
                 <Smartphone className="w-6 h-6 text-purple-600" />
               </div>
@@ -93,7 +93,7 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="bg-gray-50 p-8 rounded-xl hover:shadow-lg transition-shadow">
+            <div className="bg-white/70 backdrop-blur-sm p-8 rounded-xl hover:shadow-lg transition-shadow">
               <div className="bg-indigo-100 w-12 h-12 rounded-lg flex items-center justify-center mb-6">
                 <Shield className="w-6 h-6 text-indigo-600" />
               </div>
@@ -103,7 +103,7 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="bg-gray-50 p-8 rounded-xl hover:shadow-lg transition-shadow">
+            <div className="bg-white/70 backdrop-blur-sm p-8 rounded-xl hover:shadow-lg transition-shadow">
               <div className="bg-yellow-100 w-12 h-12 rounded-lg flex items-center justify-center mb-6">
                 <CheckCircle className="w-6 h-6 text-yellow-600" />
               </div>
@@ -113,7 +113,7 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="bg-gray-50 p-8 rounded-xl hover:shadow-lg transition-shadow">
+            <div className="bg-white/70 backdrop-blur-sm p-8 rounded-xl hover:shadow-lg transition-shadow">
               <div className="bg-red-100 w-12 h-12 rounded-lg flex items-center justify-center mb-6">
                 <FileText className="w-6 h-6 text-red-600" />
               </div>
@@ -127,7 +127,7 @@ export default function Home() {
       </div>
 
       {/* How It Works Section */}
-      <div className="py-20 bg-gray-50">
+      <div className="py-20 bg-white/60 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
@@ -175,7 +175,7 @@ export default function Home() {
       </div>
 
       {/* CTA Section */}
-      <div className="bg-blue-600 text-white py-16">
+      <div className="bg-blue-600/90 backdrop-blur-sm text-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to Apply?</h2>
           <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
