@@ -47,7 +47,7 @@ export default function Apply() {
     passportPhoto: null,
     idDocument: null,
     birthCertificate: null,
-    proofOfAddress: null,
+    proofOfAddress: null
     proofOfPayment: null
   });
 
