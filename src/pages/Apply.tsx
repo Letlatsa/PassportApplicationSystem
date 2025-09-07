@@ -75,6 +75,11 @@ export default function Apply() {
       // Generate reference number
       const refNumber = `LSO${Date.now().toString().slice(-8)}`;
       
+      // Validate required fields
+      if (!formData.firstName || !formData.lastName || !formData.address) {
+        throw new Error('Please fill in all required fields');
+      }
+
       // In a real app, you would upload files to Supabase Storage here
       // For now, we'll use placeholder URLs
       const applicationData = {
@@ -94,35 +99,44 @@ export default function Apply() {
         birth_certificate_url: formData.birthCertificate ? 'uploaded' : null,
         proof_of_address_url: formData.proofOfAddress ? 'uploaded' : null,
         proof_of_payment_url: formData.proofOfPayment ? 'uploaded' : null,
-        proof_of_payment_url: formData.proofOfPayment ? 'uploaded' : null,
         status: 'submitted' as const,
         collection_point_id: null,
         qr_code: null
       };
 
+      console.log('Submitting application data:', applicationData);
+
       const { error } = await createApplication(applicationData);
       
       if (error) {
+        console.error('Supabase error:', error);
         throw error;
       }
 
       // Send confirmation email
-      await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-confirmation-email`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: formData.email,
-          name: `${formData.firstName} ${formData.lastName}`,
-          reference_number: refNumber
-        })
-      });
+      try {
+        await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-confirmation-email`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: formData.email,
+            name: `${formData.firstName} ${formData.lastName}`,
+            reference_number: refNumber
+          })
+        });
+      } catch (emailError) {
+        console.warn('Email sending failed:', emailError);
+        // Don't fail the application submission if email fails
+      }
+
       navigate('/dashboard');
     } catch (error) {
       console.error('Error submitting application:', error);
-      alert('Error submitting application. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      alert(`Error submitting application: ${errorMessage}. Please try again.`);
     } finally {
       setIsSubmitting(false);
     }

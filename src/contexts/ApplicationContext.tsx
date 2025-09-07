@@ -50,11 +50,17 @@ export function ApplicationProvider({ children }: { children: React.ReactNode })
   };
 
   const createApplication = async (applicationData: ApplicationInsert) => {
+    console.log('Creating application with data:', applicationData);
+    
     const { data, error } = await supabase
       .from('passport_applications')
       .insert([applicationData])
       .select()
       .single();
+
+    if (error) {
+      console.error('Database error:', error);
+    }
 
     if (!error && data) {
       await refreshApplications();
