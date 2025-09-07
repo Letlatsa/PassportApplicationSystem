@@ -12,6 +12,11 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
+  const [showApplicationModal, setShowApplicationModal] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [showRejectionModal, setShowRejectionModal] = useState(false);
+  const [applicationToReject, setApplicationToReject] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -29,6 +34,12 @@ export default function AdminDashboard() {
   };
 
   const updateStatus = async (id: string, newStatus: string) => {
+    if (newStatus === 'rejected') {
+      setApplicationToReject(id);
+      setShowRejectionModal(true);
+      return;
+    }
+
     const { error } = await supabase
       .from('passport_applications')
       .update({ 
@@ -48,8 +59,71 @@ export default function AdminDashboard() {
           updated_by: 'admin'
         }]);
 
+      // Send approval email if approved
+      if (newStatus === 'approved') {
+        const application = applications.find(app => app.id === id);
+        if (application) {
+          await sendApprovalEmail(application);
+        }
+      }
+
       fetchApplications();
     }
+  };
+
+  const handleRejection = async () => {
+    if (!applicationToReject || !rejectionReason.trim()) {
+      alert('Please provide a reason for rejection');
+      return;
+    }
+
+    const { error } = await supabase
+      .from('passport_applications')
+      .update({ 
+        status: 'rejected',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', applicationToReject);
+
+    if (!error) {
+      await supabase
+        .from('application_status_updates')
+        .insert([{
+          application_id: applicationToReject,
+          status: 'rejected',
+          notes: rejectionReason,
+          updated_by: 'admin'
+        }]);
+
+      fetchApplications();
+      setShowRejectionModal(false);
+      setRejectionReason('');
+      setApplicationToReject(null);
+    }
+  };
+
+  const sendApprovalEmail = async (application: Application) => {
+    try {
+      await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-approval-email`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: application.email,
+          name: `${application.first_name} ${application.last_name}`,
+          reference_number: application.reference_number
+        })
+      });
+    } catch (error) {
+      console.error('Error sending approval email:', error);
+    }
+  };
+
+  const viewApplication = (application: Application) => {
+    setSelectedApplication(application);
+    setShowApplicationModal(true);
   };
 
   const getStats = () => {
@@ -246,18 +320,26 @@ export default function AdminDashboard() {
                     {new Date(application.created_at).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <select
-                      value={application.status}
-                      onChange={(e) => updateStatus(application.id, e.target.value)}
-                      className="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="submitted">Submitted</option>
-                      <option value="under_review">Under Review</option>
-                      <option value="approved">Approved</option>
-                      <option value="ready_for_collection">Ready for Collection</option>
-                      <option value="collected">Collected</option>
-                      <option value="rejected">Rejected</option>
-                    </select>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => viewApplication(application)}
+                        className="text-blue-600 hover:text-blue-800 text-xs font-medium"
+                      >
+                        View
+                      </button>
+                      <select
+                        value={application.status}
+                        onChange={(e) => updateStatus(application.id, e.target.value)}
+                        className="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="submitted">Submitted</option>
+                        <option value="under_review">Under Review</option>
+                        <option value="approved">Approved</option>
+                        <option value="ready_for_collection">Ready for Collection</option>
+                        <option value="collected">Collected</option>
+                        <option value="rejected">Rejected</option>
+                      </select>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -273,6 +355,161 @@ export default function AdminDashboard() {
           <p className="text-gray-600">
             No applications match your current search and filter criteria.
           </p>
+        </div>
+      )}
+
+      {/* Application Details Modal */}
+      {showApplicationModal && selectedApplication && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <h3 className="text-xl font-semibold text-gray-900">
+                  Application Details - {selectedApplication.reference_number}
+                </h3>
+                <button
+                  onClick={() => setShowApplicationModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-6 space-y-6">
+              {/* Personal Information */}
+              <div>
+                <h4 className="text-lg font-semibold text-gray-900 mb-3">Personal Information</h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div><span className="font-medium">Name:</span> {selectedApplication.first_name} {selectedApplication.last_name}</div>
+                  <div><span className="font-medium">Date of Birth:</span> {new Date(selectedApplication.date_of_birth).toLocaleDateString()}</div>
+                  <div><span className="font-medium">Place of Birth:</span> {selectedApplication.place_of_birth}</div>
+                  <div><span className="font-medium">Nationality:</span> {selectedApplication.nationality}</div>
+                  <div><span className="font-medium">Email:</span> {selectedApplication.email}</div>
+                  <div><span className="font-medium">Phone:</span> {selectedApplication.phone}</div>
+                  <div className="col-span-2"><span className="font-medium">Address:</span> {selectedApplication.address}</div>
+                </div>
+              </div>
+
+              {/* Emergency Contact */}
+              <div>
+                <h4 className="text-lg font-semibold text-gray-900 mb-3">Emergency Contact</h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div><span className="font-medium">Name:</span> {selectedApplication.emergency_contact_name}</div>
+                  <div><span className="font-medium">Phone:</span> {selectedApplication.emergency_contact_phone}</div>
+                </div>
+              </div>
+
+              {/* Documents */}
+              <div>
+                <h4 className="text-lg font-semibold text-gray-900 mb-3">Uploaded Documents</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {selectedApplication.id_document_url && (
+                    <div className="border border-gray-200 rounded-lg p-3">
+                      <p className="font-medium text-sm text-gray-900 mb-2">National ID / Birth Certificate</p>
+                      <div className="bg-blue-50 p-2 rounded text-center">
+                        <FileText className="w-8 h-8 text-blue-600 mx-auto mb-1" />
+                        <p className="text-xs text-blue-600">Document Uploaded</p>
+                      </div>
+                    </div>
+                  )}
+                  {selectedApplication.proof_of_address_url && (
+                    <div className="border border-gray-200 rounded-lg p-3">
+                      <p className="font-medium text-sm text-gray-900 mb-2">Village Chief Letter</p>
+                      <div className="bg-green-50 p-2 rounded text-center">
+                        <FileText className="w-8 h-8 text-green-600 mx-auto mb-1" />
+                        <p className="text-xs text-green-600">Document Uploaded</p>
+                      </div>
+                    </div>
+                  )}
+                  {selectedApplication.proof_of_payment_url && (
+                    <div className="border border-gray-200 rounded-lg p-3">
+                      <p className="font-medium text-sm text-gray-900 mb-2">Proof of Payment</p>
+                      <div className="bg-purple-50 p-2 rounded text-center">
+                        <FileText className="w-8 h-8 text-purple-600 mx-auto mb-1" />
+                        <p className="text-xs text-purple-600">Payment Verified</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Status Actions */}
+              <div className="border-t pt-4">
+                <h4 className="text-lg font-semibold text-gray-900 mb-3">Update Status</h4>
+                <div className="flex space-x-3">
+                  {selectedApplication.status === 'submitted' && (
+                    <button
+                      onClick={() => {
+                        updateStatus(selectedApplication.id, 'under_review');
+                        setShowApplicationModal(false);
+                      }}
+                      className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                    >
+                      Start Review
+                    </button>
+                  )}
+                  {selectedApplication.status === 'under_review' && (
+                    <>
+                      <button
+                        onClick={() => {
+                          updateStatus(selectedApplication.id, 'approved');
+                          setShowApplicationModal(false);
+                        }}
+                        className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowApplicationModal(false);
+                          updateStatus(selectedApplication.id, 'rejected');
+                        }}
+                        className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                      >
+                        Reject
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rejection Modal */}
+      {showRejectionModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Reject Application</h3>
+            <p className="text-gray-600 mb-4">Please provide a reason for rejecting this application:</p>
+            <textarea
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.target.value)}
+              rows={4}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              placeholder="Enter rejection reason..."
+            />
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowRejectionModal(false);
+                  setRejectionReason('');
+                  setApplicationToReject(null);
+                }}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRejection}
+                className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors"
+              >
+                Reject Application
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

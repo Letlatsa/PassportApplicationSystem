@@ -19,7 +19,6 @@ export interface ApplicationFormData {
   address: string;
   emergencyContactName: string;
   emergencyContactPhone: string;
-  passportPhoto: File | null;
   idDocument: File | null;
   birthCertificate: File | null;
   proofOfAddress: File | null;
@@ -44,7 +43,6 @@ export default function Apply() {
     address: '',
     emergencyContactName: '',
     emergencyContactPhone: '',
-    passportPhoto: null,
     idDocument: null,
     birthCertificate: null,
     proofOfAddress: null,
@@ -92,10 +90,10 @@ export default function Apply() {
         address: formData.address,
         emergency_contact_name: formData.emergencyContactName,
         emergency_contact_phone: formData.emergencyContactPhone,
-        passport_photo_url: formData.passportPhoto ? 'uploaded' : null,
         id_document_url: formData.idDocument ? 'uploaded' : null,
         birth_certificate_url: formData.birthCertificate ? 'uploaded' : null,
         proof_of_address_url: formData.proofOfAddress ? 'uploaded' : null,
+        proof_of_payment_url: formData.proofOfPayment ? 'uploaded' : null,
         proof_of_payment_url: formData.proofOfPayment ? 'uploaded' : null,
         status: 'submitted' as const,
         collection_point_id: null,
@@ -133,14 +131,15 @@ export default function Apply() {
   const CurrentStepComponent = steps[currentStep - 1].component;
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-screen">
+    <div className="min-h-screen py-4 sm:py-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
       {/* Progress Bar */}
-      <div className="mb-8 bg-white/90 backdrop-blur-sm rounded-lg p-6">
-        <div className="flex items-center justify-between mb-4">
+      <div className="mb-6 sm:mb-8 bg-white/90 backdrop-blur-sm rounded-lg p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 space-y-2 sm:space-y-0">
           {steps.map((step, index) => (
-            <div key={step.number} className="flex-1 flex items-center">
+            <div key={step.number} className="flex-1 flex items-center w-full sm:w-auto">
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
+                className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-semibold flex-shrink-0 ${
                   currentStep >= step.number
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-200 text-gray-600'
@@ -148,17 +147,17 @@ export default function Apply() {
               >
                 {step.number}
               </div>
-              <div className="ml-3 flex-1">
+              <div className="ml-2 sm:ml-3 flex-1 min-w-0">
                 <p
-                  className={`text-sm font-medium ${
+                  className={`text-xs sm:text-sm font-medium truncate ${
                     currentStep >= step.number ? 'text-blue-600' : 'text-gray-500'
                   }`}
                 >
                   {step.title}
                 </p>
               </div>
-              {index < steps.length - 1 && (
-                <ChevronRight className="w-5 h-5 text-gray-400 ml-4" />
+              {index < steps.length - 1 && !window.matchMedia('(max-width: 640px)').matches && (
+                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 ml-2 sm:ml-4 hidden sm:block" />
               )}
             </div>
           ))}
@@ -173,7 +172,7 @@ export default function Apply() {
       </div>
 
       {/* Current Step */}
-      <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-6 mb-8">
+      <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-4 sm:p-6 mb-6 sm:mb-8">
         <CurrentStepComponent
           formData={formData}
           updateFormData={setFormData}
@@ -184,6 +183,7 @@ export default function Apply() {
           isLast={currentStep === steps.length}
           isSubmitting={isSubmitting}
         />
+      </div>
       </div>
     </div>
   );

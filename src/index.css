@@ -2,13 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Lesotho flag colors background */
+/* Lesotho flag colors background - Blue, White, Black, Green */
 body {
   background: linear-gradient(135deg, 
-    #0066cc 0%,    /* Blue */
-    #ffffff 33%,   /* White */
-    #cc0000 66%,   /* Red */
-    #00cc00 100%   /* Green */
+    #0066cc 0%,     /* Blue */
+    #ffffff 25%,    /* White */
+    #000000 50%,    /* Black */
+    #ffffff 75%,    /* White */
+    #00cc00 100%    /* Green */
   );
   background-attachment: fixed;
   min-height: 100vh;

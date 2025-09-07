@@ -27,6 +27,7 @@ export type Database = {
           id_document_url: string | null;
           birth_certificate_url: string | null;
           proof_of_address_url: string | null;
+          proof_of_payment_url: string | null;
           status: 'submitted' | 'under_review' | 'approved' | 'ready_for_collection' | 'collected' | 'rejected';
           collection_point_id: string | null;
           qr_code: string | null;

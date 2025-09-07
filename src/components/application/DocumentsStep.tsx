@@ -19,7 +19,7 @@ export default function DocumentsStep({ formData, updateFormData, onNext, onPrev
 
   const validateAndNext = () => {
     // Check if all required documents are uploaded
-    const requiredDocs = ['passportPhoto', 'idDocument', 'proofOfAddress'];
+    const requiredDocs = ['idDocument', 'proofOfAddress'];
     const missingDocs = requiredDocs.filter(doc => !formData[doc as keyof ApplicationFormData]);
     
     if (missingDocs.length > 0) {
@@ -31,12 +31,6 @@ export default function DocumentsStep({ formData, updateFormData, onNext, onPrev
   };
 
   const documents = [
-    {
-      key: 'passportPhoto' as keyof ApplicationFormData,
-      title: 'Passport Photo',
-      description: 'Recent color photo with white background (JPEG/PNG, max 5MB)',
-      required: true
-    },
     {
       key: 'idDocument' as keyof ApplicationFormData, 
       title: 'National ID OR Birth Certificate',
@@ -53,22 +47,22 @@ export default function DocumentsStep({ formData, updateFormData, onNext, onPrev
 
   return (
     <div>
-      <div className="mb-6">
+      <div className="mb-4 sm:mb-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Upload Documents</h2>
         <p className="text-gray-600">
           Please upload all required documents. Ensure they are clear and readable.
         </p>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         {documents.map((doc) => {
           const file = formData[doc.key] as File | null;
           
           return (
-            <div key={doc.key} className="border border-gray-200 rounded-lg p-6">
-              <div className="flex items-start justify-between mb-4">
+            <div key={doc.key} className="border border-gray-200 rounded-lg p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-4 space-y-2 sm:space-y-0">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 flex items-center">
                     {doc.title}
                     {doc.required && <span className="text-red-500 ml-1">*</span>}
                   </h3>
@@ -148,7 +142,6 @@ export default function DocumentsStep({ formData, updateFormData, onNext, onPrev
             <ul className="text-xs space-y-1">
               <li>• All documents must be clear and readable</li>
               <li>• ID or Birth Certificate must be certified copies</li>
-              <li>• Photos must have white background</li>
               <li>• Scans should be in color and high resolution</li>
               <li>• File formats: JPEG, PNG, PDF only</li>
               <li>• Village chief letter must be official and signed</li>
@@ -157,11 +150,11 @@ export default function DocumentsStep({ formData, updateFormData, onNext, onPrev
         </div>
       </div>
 
-      <div className="flex justify-between pt-6">
+      <div className="flex flex-col sm:flex-row justify-between pt-6 space-y-3 sm:space-y-0">
         <button
           type="button"
           onClick={onPrev}
-          className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-3 rounded-lg font-semibold transition-colors flex items-center"
+          className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center"
         >
           <ChevronLeft className="w-4 h-4 mr-2" />
           Previous
@@ -170,7 +163,7 @@ export default function DocumentsStep({ formData, updateFormData, onNext, onPrev
         <button
           type="button"
           onClick={validateAndNext}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center"
         >
           Next Step
           <ChevronRight className="w-4 h-4 ml-2" />
