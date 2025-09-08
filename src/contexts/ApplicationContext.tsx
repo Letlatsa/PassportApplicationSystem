@@ -10,8 +10,8 @@ interface ApplicationContextType {
   applications: Application[];
   loading: boolean;
   refreshApplications: () => Promise<void>;
-  createApplication: (data: ApplicationInsert) => Promise<{ data: Application | null; error: any }>;
-  updateApplicationStatus: (id: string, status: string, notes?: string) => Promise<{ error: any }>;
+  createApplication: (data: ApplicationInsert) => Promise<{ data: Application | null; error: Error | null }>;
+  updateApplicationStatus: (id: string, status: string, notes?: string) => Promise<{ error: Error | null }>;
 }
 
 const ApplicationContext = createContext<ApplicationContextType | undefined>(undefined);
@@ -80,7 +80,7 @@ export function ApplicationProvider({ children }: { children: React.ReactNode })
   const updateApplicationStatus = async (id: string, status: string, notes?: string) => {
     const { error } = await supabase
       .from('passport_applications')
-      .update({ status: status as any, updated_at: new Date().toISOString() })
+      .update({ status: status as Application['status'], updated_at: new Date().toISOString() })
       .eq('id', id);
 
     if (!error) {
