@@ -65,10 +65,10 @@ export type Database = {
       };
       notification_logs: {
         Row: {
-          id: string;
           application_id: string;
           type: 'sms' | 'email';
           recipient: string;
+        proof_of_payment_url: string | null;
           message: string;
           status: 'sent' | 'failed' | 'pending';
           sent_at: string | null;

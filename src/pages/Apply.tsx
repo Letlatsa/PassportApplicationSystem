@@ -76,8 +76,8 @@ export default function Apply() {
       const refNumber = `LSO${Date.now().toString().slice(-8)}`;
       
       // Validate required fields
-      if (!formData.firstName || !formData.lastName || !formData.address) {
-        throw new Error('Please fill in all required fields');
+      if (!formData.firstName || !formData.lastName || !formData.address || !formData.email || !formData.phone) {
+        throw new Error('Please fill in all required fields: name, address, email, and phone');
       }
 
       // In a real app, you would upload files to Supabase Storage here
@@ -110,6 +110,10 @@ export default function Apply() {
       
       if (error) {
         console.error('Supabase error:', error);
+        // Provide more specific error messages
+        if (error.code === 'PGRST204') {
+          throw new Error('Database schema error. Please contact support.');
+        }
         throw error;
       }
 

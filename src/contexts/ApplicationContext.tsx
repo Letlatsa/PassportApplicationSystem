@@ -52,6 +52,13 @@ export function ApplicationProvider({ children }: { children: React.ReactNode })
   const createApplication = async (applicationData: ApplicationInsert) => {
     console.log('Creating application with data:', applicationData);
     
+    // Validate required fields before submission
+    if (!applicationData.address || !applicationData.first_name || !applicationData.last_name) {
+      const error = new Error('Missing required fields: address, first_name, or last_name');
+      console.error('Validation error:', error);
+      return { data: null, error };
+    }
+
     const { data, error } = await supabase
       .from('passport_applications')
       .insert([applicationData])
@@ -60,6 +67,7 @@ export function ApplicationProvider({ children }: { children: React.ReactNode })
 
     if (error) {
       console.error('Database error:', error);
+      console.error('Application data that failed:', applicationData);
     }
 
     if (!error && data) {
