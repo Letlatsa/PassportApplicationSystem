@@ -25,6 +25,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isOfficial, setIsOfficial] = useState(false);
 
   useEffect(() => {
     // Get initial session
@@ -32,6 +33,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data: { session } } = await supabase.auth.getSession();
       setUser(session?.user || null);
       setIsAdmin(session?.user?.email?.includes('admin') || false);
+      
+      // Check if user is an official
+      if (session?.user) {
+        const { data } = await supabase
+          .from('officials')
+          .select('id')
+          .eq('user_id', session.user.id)
+          .eq('is_active', true)
+          .single();
+        setIsOfficial(!!data);
+      }
+      
       setLoading(false);
     };
 
@@ -42,6 +55,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async (event, session) => {
         setUser(session?.user || null);
         setIsAdmin(session?.user?.email?.includes('admin') || false);
+        
+        // Check if user is an official
+        if (session?.user) {
+          const { data } = await supabase
+            .from('officials')
+            .select('id')
+            .eq('user_id', session.user.id)
+            .eq('is_active', true)
+            .single();
+          setIsOfficial(!!data);
+        } else {
+          setIsOfficial(false);
+        }
+        
         setLoading(false);
       }
     );
@@ -75,7 +102,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signIn,
     signUp,
     signOut,
-    isAdmin
+    isAdmin,
+    isOfficial
   };
 
   return (

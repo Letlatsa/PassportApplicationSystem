@@ -1,14 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Users, MapPin, TrendingUp, Search, Filter } from 'lucide-react';
+import { FileText, Users, MapPin, TrendingUp, Search, Filter, Plus, Edit, Trash2, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { Database } from '../lib/supabase';
 
 type Application = Database['public']['Tables']['passport_applications']['Row'];
 
+interface Official {
+  id: string;
+  user_id: string;
+  employee_id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+  district: string;
+  position: string;
+  is_active: boolean;
+  created_at: string;
+}
+
 export default function AdminDashboard() {
   const { isAdmin } = useAuth();
   const [applications, setApplications] = useState<Application[]>([]);
+  const [officials, setOfficials] = useState<Official[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -17,10 +32,24 @@ export default function AdminDashboard() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [showRejectionModal, setShowRejectionModal] = useState(false);
   const [applicationToReject, setApplicationToReject] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'applications' | 'officials'>('applications');
+  const [showOfficialModal, setShowOfficialModal] = useState(false);
+  const [editingOfficial, setEditingOfficial] = useState<Official | null>(null);
+  const [officialFormData, setOfficialFormData] = useState({
+    employee_id: '',
+    first_name: '',
+    last_name: '',
+    email: '',
+    phone: '',
+    district: '',
+    position: 'Passport Officer',
+    password: ''
+  });
 
   useEffect(() => {
     if (!isAdmin) return;
     fetchApplications();
+    fetchOfficials();
   }, [isAdmin]);
 
   const fetchApplications = async () => {
@@ -31,6 +60,133 @@ export default function AdminDashboard() {
 
     setApplications(data || []);
     setLoading(false);
+  };
+
+  const fetchOfficials = async () => {
+    const { data } = await supabase
+      .from('officials')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    setOfficials(data || []);
+  };
+
+  const districts = [
+    'Butha-Buthe', 'Leribe', 'Berea', 'Maseru', 'Mafeteng', 
+    'Mohale\'s Hoek', 'Qacha\'s Nek', 'Quthing', 'Mokhotlong', 'Thaba-Tseka'
+  ];
+
+  const handleCreateOfficial = async () => {
+    if (!officialFormData.employee_id || !officialFormData.first_name || !officialFormData.last_name || 
+        !officialFormData.email || !officialFormData.phone || !officialFormData.district || !officialFormData.password) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      // Create auth user first
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        email: officialFormData.email,
+        password: officialFormData.password,
+        user_metadata: {
+          first_name: officialFormData.first_name,
+          last_name: officialFormData.last_name,
+          role: 'official'
+        }
+      });
+
+      if (authError) throw authError;
+
+      // Create official record
+      const { error: officialError } = await supabase
+        .from('officials')
+        .insert([{
+          user_id: authData.user.id,
+          employee_id: officialFormData.employee_id,
+          first_name: officialFormData.first_name,
+          last_name: officialFormData.last_name,
+          email: officialFormData.email,
+          phone: officialFormData.phone,
+          district: officialFormData.district,
+          position: officialFormData.position,
+          created_by: user?.id
+        }]);
+
+      if (officialError) throw officialError;
+
+      alert('Official account created successfully!');
+      setShowOfficialModal(false);
+      resetOfficialForm();
+      fetchOfficials();
+    } catch (error: any) {
+      alert(`Error creating official: ${error.message}`);
+    }
+  };
+
+  const handleUpdateOfficial = async () => {
+    if (!editingOfficial) return;
+
+    const { error } = await supabase
+      .from('officials')
+      .update({
+        employee_id: officialFormData.employee_id,
+        first_name: officialFormData.first_name,
+        last_name: officialFormData.last_name,
+        email: officialFormData.email,
+        phone: officialFormData.phone,
+        district: officialFormData.district,
+        position: officialFormData.position
+      })
+      .eq('id', editingOfficial.id);
+
+    if (!error) {
+      alert('Official updated successfully!');
+      setShowOfficialModal(false);
+      setEditingOfficial(null);
+      resetOfficialForm();
+      fetchOfficials();
+    }
+  };
+
+  const handleDeleteOfficial = async (officialId: string) => {
+    if (!confirm('Are you sure you want to delete this official?')) return;
+
+    const { error } = await supabase
+      .from('officials')
+      .update({ is_active: false })
+      .eq('id', officialId);
+
+    if (!error) {
+      fetchOfficials();
+    }
+  };
+
+  const resetOfficialForm = () => {
+    setOfficialFormData({
+      employee_id: '',
+      first_name: '',
+      last_name: '',
+      email: '',
+      phone: '',
+      district: '',
+      position: 'Passport Officer',
+      password: ''
+    });
+  };
+
+  const openEditModal = (official: Official) => {
+    setEditingOfficial(official);
+    setOfficialFormData({
+      employee_id: official.employee_id,
+      first_name: official.first_name,
+      last_name: official.last_name,
+      email: official.email,
+      phone: official.phone,
+      district: official.district,
+      position: official.position,
+      password: ''
+    });
+    setShowOfficialModal(true);
   };
 
   const updateStatus = async (id: string, newStatus: string) => {
@@ -181,6 +337,32 @@ export default function AdminDashboard() {
         <p className="text-gray-600">
           Manage passport applications and monitor system performance
         </p>
+        
+        {/* Tab Navigation */}
+        <div className="mt-6 border-b border-gray-200">
+          <nav className="-mb-px flex space-x-8">
+            <button
+              onClick={() => setActiveTab('applications')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'applications'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Applications
+            </button>
+            <button
+              onClick={() => setActiveTab('officials')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'officials'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Officials Management
+            </button>
+          </nav>
+        </div>
       </div>
 
       {/* Statistics */}
@@ -234,119 +416,343 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <div className="flex flex-col lg:flex-row gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Search by reference number, name..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+      {activeTab === 'applications' && (
+        <>
+          {/* Filters */}
+          <div className="bg-white rounded-lg shadow p-6 mb-6">
+            <div className="flex flex-col lg:flex-row gap-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Search by reference number, name..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Filter className="w-4 h-4 text-gray-400" />
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="submitted">Submitted</option>
+                  <option value="under_review">Under Review</option>
+                  <option value="approved">Approved</option>
+                  <option value="ready_for_collection">Ready for Collection</option>
+                  <option value="collected">Collected</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+              </div>
+            </div>
           </div>
-          
-          <div className="flex items-center space-x-2">
-            <Filter className="w-4 h-4 text-gray-400" />
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="all">All Statuses</option>
-              <option value="submitted">Submitted</option>
-              <option value="under_review">Under Review</option>
-              <option value="approved">Approved</option>
-              <option value="ready_for_collection">Ready for Collection</option>
-              <option value="collected">Collected</option>
-              <option value="rejected">Rejected</option>
-            </select>
-          </div>
-        </div>
-      </div>
 
-      {/* Applications Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Applicant
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Reference
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Submitted
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredApplications.map((application) => (
-                <tr key={application.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">
-                        {application.first_name} {application.last_name}
-                      </div>
-                      <div className="text-sm text-gray-500">{application.email}</div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-mono text-gray-900">{application.reference_number}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      application.status === 'submitted' ? 'bg-blue-100 text-blue-800' :
-                      application.status === 'under_review' ? 'bg-yellow-100 text-yellow-800' :
-                      application.status === 'approved' ? 'bg-green-100 text-green-800' :
-                      application.status === 'ready_for_collection' ? 'bg-purple-100 text-purple-800' :
-                      application.status === 'collected' ? 'bg-emerald-100 text-emerald-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>
-                      {application.status.replace('_', ' ')}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(application.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => viewApplication(application)}
-                        className="text-blue-600 hover:text-blue-800 text-xs font-medium"
-                      >
-                        View
-                      </button>
-                      <select
-                        value={application.status}
-                        onChange={(e) => updateStatus(application.id, e.target.value)}
-                        className="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="submitted">Submitted</option>
-                        <option value="under_review">Under Review</option>
-                        <option value="approved">Approved</option>
-                        <option value="ready_for_collection">Ready for Collection</option>
-                        <option value="collected">Collected</option>
-                        <option value="rejected">Rejected</option>
-                      </select>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {/* Applications Table */}
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Applicant
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Reference
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Submitted
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredApplications.map((application) => (
+                    <tr key={application.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {application.first_name} {application.last_name}
+                          </div>
+                          <div className="text-sm text-gray-500">{application.email}</div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-mono text-gray-900">{application.reference_number}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          application.status === 'submitted' ? 'bg-blue-100 text-blue-800' :
+                          application.status === 'under_review' ? 'bg-yellow-100 text-yellow-800' :
+                          application.status === 'approved' ? 'bg-green-100 text-green-800' :
+                          application.status === 'ready_for_collection' ? 'bg-purple-100 text-purple-800' :
+                          application.status === 'collected' ? 'bg-emerald-100 text-emerald-800' :
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          {application.status.replace('_', ' ')}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {new Date(application.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => viewApplication(application)}
+                            className="text-blue-600 hover:text-blue-800 text-xs font-medium"
+                          >
+                            View
+                          </button>
+                          <select
+                            value={application.status}
+                            onChange={(e) => updateStatus(application.id, e.target.value)}
+                            className="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="submitted">Submitted</option>
+                            <option value="under_review">Under Review</option>
+                            <option value="approved">Approved</option>
+                            <option value="ready_for_collection">Ready for Collection</option>
+                            <option value="collected">Collected</option>
+                            <option value="rejected">Rejected</option>
+                          </select>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+
+      {activeTab === 'officials' && (
+        <>
+          {/* Officials Header */}
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">Officials Management</h2>
+            <button
+              onClick={() => {
+                resetOfficialForm();
+                setEditingOfficial(null);
+                setShowOfficialModal(true);
+              }}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors flex items-center"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Official
+            </button>
+          </div>
+
+          {/* Officials Table */}
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Official
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Employee ID
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      District
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Position
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {officials.map((official) => (
+                    <tr key={official.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {official.first_name} {official.last_name}
+                          </div>
+                          <div className="text-sm text-gray-500">{official.email}</div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-mono text-gray-900">{official.employee_id}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{official.district}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{official.position}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          official.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        }`}>
+                          {official.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => openEditModal(official)}
+                            className="text-blue-600 hover:text-blue-800 text-xs font-medium flex items-center"
+                          >
+                            <Edit className="w-3 h-3 mr-1" />
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteOfficial(official.id)}
+                            className="text-red-600 hover:text-red-800 text-xs font-medium flex items-center"
+                          >
+                            <Trash2 className="w-3 h-3 mr-1" />
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Official Modal */}
+      {showOfficialModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-semibold text-gray-900">
+                {editingOfficial ? 'Edit Official' : 'Add New Official'}
+              </h3>
+              <button
+                onClick={() => setShowOfficialModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Employee ID</label>
+                <input
+                  type="text"
+                  value={officialFormData.employee_id}
+                  onChange={(e) => setOfficialFormData({...officialFormData, employee_id: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                <input
+                  type="text"
+                  value={officialFormData.first_name}
+                  onChange={(e) => setOfficialFormData({...officialFormData, first_name: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                <input
+                  type="text"
+                  value={officialFormData.last_name}
+                  onChange={(e) => setOfficialFormData({...officialFormData, last_name: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={officialFormData.email}
+                  onChange={(e) => setOfficialFormData({...officialFormData, email: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                <input
+                  type="tel"
+                  value={officialFormData.phone}
+                  onChange={(e) => setOfficialFormData({...officialFormData, phone: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">District</label>
+                <select
+                  value={officialFormData.district}
+                  onChange={(e) => setOfficialFormData({...officialFormData, district: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select District</option>
+                  {districts.map(district => (
+                    <option key={district} value={district}>{district}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Position</label>
+                <input
+                  type="text"
+                  value={officialFormData.position}
+                  onChange={(e) => setOfficialFormData({...officialFormData, position: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              {!editingOfficial && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                  <input
+                    type="password"
+                    value={officialFormData.password}
+                    onChange={(e) => setOfficialFormData({...officialFormData, password: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              )}
+            </div>
+            
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={() => setShowOfficialModal(false)}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={editingOfficial ? handleUpdateOfficial : handleCreateOfficial}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors"
+              >
+                {editingOfficial ? 'Update Official' : 'Create Official'}
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
       {filteredApplications.length === 0 && (
         <div className="bg-white rounded-lg shadow p-12 text-center">

@@ -10,6 +10,7 @@ import Apply from './pages/Apply';
 import Dashboard from './pages/Dashboard';
 import CollectionPoints from './pages/CollectionPoints';
 import AdminDashboard from './pages/AdminDashboard';
+import OfficialDashboard from './pages/OfficialDashboard';
 import CollectionInterface from './pages/CollectionInterface';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -56,6 +57,7 @@ function App() {
                 <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                 <Route path="/collection-points" element={<ProtectedRoute><CollectionPoints /></ProtectedRoute>} />
                 <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+                <Route path="/official" element={<ProtectedRoute><OfficialDashboard /></ProtectedRoute>} />
                 <Route path="/collection-interface" element={<CollectionInterface />} />
               </Routes>
             </main>
