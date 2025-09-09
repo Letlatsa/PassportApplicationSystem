@@ -2,15 +2,35 @@ import React from 'react';
 import { ChevronLeft, Check, FileText, AlertCircle } from 'lucide-react';
 import type { ApplicationFormData } from '../../pages/Apply';
 import { format } from 'date-fns';
+import { supabase } from '../../lib/supabase';
+import { useState, useEffect } from 'react';
 
 interface ReviewStepProps {
-  formData: ApplicationFormData;
+  formData: ApplicationFormData & { collectionPointId?: string };
   onPrev: () => void;
   onSubmit: () => void;
   isSubmitting: boolean;
 }
 
 export default function ReviewStep({ formData, onPrev, onSubmit, isSubmitting }: ReviewStepProps) {
+  const [collectionPoint, setCollectionPoint] = useState<any>(null);
+
+  useEffect(() => {
+    if (formData.collectionPointId) {
+      fetchCollectionPoint();
+    }
+  }, [formData.collectionPointId]);
+
+  const fetchCollectionPoint = async () => {
+    const { data } = await supabase
+      .from('collection_points')
+      .select('*')
+      .eq('id', formData.collectionPointId)
+      .single();
+    
+    setCollectionPoint(data);
+  };
+
   const personalInfo = [
     { label: 'First Name', value: formData.firstName },
     { label: 'Last Name', value: formData.lastName },
@@ -67,6 +87,21 @@ export default function ReviewStep({ formData, onPrev, onSubmit, isSubmitting }:
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Collection Point */}
+        <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Selected Collection Point</h3>
+          {collectionPoint ? (
+            <div className="space-y-2">
+              <div><span className="font-medium">Name:</span> {collectionPoint.name}</div>
+              <div><span className="font-medium">Address:</span> {collectionPoint.address}</div>
+              <div><span className="font-medium">District:</span> {collectionPoint.district}</div>
+              <div><span className="font-medium">Phone:</span> {collectionPoint.contact_phone}</div>
+            </div>
+          ) : (
+            <p className="text-red-600">No collection point selected</p>
+          )}
         </div>
 
         {/* Documents */}

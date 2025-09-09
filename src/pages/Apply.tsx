@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
 import PersonalInfoStep from '../components/application/PersonalInfoStep';
 import DocumentsStep from '../components/application/DocumentsStep';
+import CollectionPointStep from '../components/application/CollectionPointStep';
 import PaymentStep from '../components/application/PaymentStep';
 import ReviewStep from '../components/application/ReviewStep';
 import { useAuth } from '../contexts/AuthContext';
@@ -19,6 +20,7 @@ export interface ApplicationFormData {
   address: string;
   emergencyContactName: string;
   emergencyContactPhone: string;
+  collectionPointId?: string;
   idDocument: File | null;
   birthCertificate: File | null;
   proofOfAddress: File | null;
@@ -51,9 +53,10 @@ export default function Apply() {
 
   const steps = [
     { number: 1, title: 'Personal Information', component: PersonalInfoStep },
-    { number: 2, title: 'Documents', component: DocumentsStep },
-    { number: 3, title: 'Payment', component: PaymentStep },
-    { number: 4, title: 'Review & Submit', component: ReviewStep }
+    { number: 2, title: 'Collection Point', component: CollectionPointStep },
+    { number: 3, title: 'Documents', component: DocumentsStep },
+    { number: 4, title: 'Payment', component: PaymentStep },
+    { number: 5, title: 'Review & Submit', component: ReviewStep }
   ];
 
   const nextStep = () => {
@@ -76,8 +79,8 @@ export default function Apply() {
       const refNumber = `LSO${Date.now().toString().slice(-8)}`;
       
       // Validate required fields
-      if (!formData.firstName || !formData.lastName || !formData.address || !formData.email || !formData.phone) {
-        throw new Error('Please fill in all required fields: name, address, email, and phone');
+      if (!formData.firstName || !formData.lastName || !formData.address || !formData.email || !formData.phone || !formData.collectionPointId) {
+        throw new Error('Please fill in all required fields: name, address, email, phone, and collection point');
       }
 
       // In a real app, you would upload files to Supabase Storage here
@@ -99,8 +102,8 @@ export default function Apply() {
         birth_certificate_url: formData.birthCertificate ? 'uploaded' : null,
         proof_of_address_url: formData.proofOfAddress ? 'uploaded' : null,
         proof_of_payment_url: formData.proofOfPayment ? 'uploaded' : null,
+        collection_point_id: formData.collectionPointId,
         status: 'submitted' as const,
-        collection_point_id: null,
         qr_code: null
       };
 
