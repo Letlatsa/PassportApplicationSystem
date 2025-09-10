@@ -150,7 +150,11 @@ export default function OfficialDashboard() {
 
   const handleRejection = async () => {
     if (!applicationToReject || !rejectionReason.trim()) {
-      alert('Please provide a reason for rejection');
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50';
+      errorDiv.textContent = 'Please provide a reason for rejection';
+      document.body.appendChild(errorDiv);
+      setTimeout(() => errorDiv.remove(), 3000);
       return;
     }
 
@@ -174,16 +178,31 @@ export default function OfficialDashboard() {
           updated_by: user?.id
         }]);
 
+      const successDiv = document.createElement('div');
+      successDiv.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50';
+      successDiv.textContent = 'Application rejected successfully';
+      document.body.appendChild(successDiv);
+      setTimeout(() => successDiv.remove(), 3000);
       fetchApplications();
       setShowRejectionModal(false);
       setRejectionReason('');
       setApplicationToReject(null);
+    } else {
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50';
+      errorDiv.textContent = 'Error rejecting application';
+      document.body.appendChild(errorDiv);
+      setTimeout(() => errorDiv.remove(), 3000);
     }
   };
 
   const handleBiometricsCapture = async () => {
     if (!selectedApplication || !passportPhoto) {
-      alert('Please upload passport photo');
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50';
+      errorDiv.textContent = 'Please upload passport photo';
+      document.body.appendChild(errorDiv);
+      setTimeout(() => errorDiv.remove(), 3000);
       return;
     }
 
@@ -205,13 +224,22 @@ export default function OfficialDashboard() {
         // Update application status to ready for collection
         await updateStatus(selectedApplication.id, 'ready_for_collection');
         
-        alert('Biometrics captured successfully!');
+        const successDiv = document.createElement('div');
+        successDiv.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50';
+        successDiv.textContent = 'Biometrics captured successfully!';
+        document.body.appendChild(successDiv);
+        setTimeout(() => successDiv.remove(), 3000);
+        
         setShowBiometricsModal(false);
         setPassportPhoto(null);
         setFingerprintData('');
       }
     } catch (error) {
-      alert('Error capturing biometrics');
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50';
+      errorDiv.textContent = 'Error capturing biometrics';
+      document.body.appendChild(errorDiv);
+      setTimeout(() => errorDiv.remove(), 3000);
     }
   };
 
@@ -510,6 +538,8 @@ export default function OfficialDashboard() {
                   Fingerprint Data
                 </h4>
                 <textarea
+                  id="fingerprint_data"
+                  name="fingerprint_data"
                   value={fingerprintData}
                   onChange={(e) => setFingerprintData(e.target.value)}
                   rows={4}
@@ -544,6 +574,8 @@ export default function OfficialDashboard() {
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Reject Application</h3>
             <p className="text-gray-600 mb-4">Please provide a reason for rejecting this application:</p>
             <textarea
+              id="rejection_reason_official"
+              name="rejection_reason_official"
               value={rejectionReason}
               onChange={(e) => setRejectionReason(e.target.value)}
               rows={4}

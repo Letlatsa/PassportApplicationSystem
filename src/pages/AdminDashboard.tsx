@@ -95,17 +95,37 @@ export default function AdminDashboard() {
   const handleCreateOfficial = async () => {
     if (!officialFormData.employee_id || !officialFormData.first_name || !officialFormData.last_name || 
         !officialFormData.email || !officialFormData.phone || !officialFormData.district || !officialFormData.password) {
-      alert('Please fill in all required fields');
+      console.error('Please fill in all required fields');
+      // Use a more user-friendly notification instead of alert
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50';
+      errorDiv.textContent = 'Please fill in all required fields';
+      document.body.appendChild(errorDiv);
+      setTimeout(() => errorDiv.remove(), 3000);
       return;
     }
 
     try {
-      // For demo purposes, create a mock official record
-      // In production, you would integrate with proper user management
+      // Create user account first
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: officialFormData.email,
+        password: officialFormData.password,
+        options: {
+          data: {
+            first_name: officialFormData.first_name,
+            last_name: officialFormData.last_name,
+            role: 'staff'
+          }
+        }
+      });
+
+      if (authError) throw authError;
+
+      // Create profile record
       const { error: officialError } = await supabase
         .from('profiles')
         .insert([{
-          user_id: crypto.randomUUID(), // Mock user ID
+          user_id: authData.user?.id || crypto.randomUUID(),
           first_name: officialFormData.first_name,
           last_name: officialFormData.last_name,
           national_id: officialFormData.employee_id,
@@ -118,12 +138,23 @@ export default function AdminDashboard() {
 
       if (officialError) throw officialError;
 
-      alert('Official account created successfully!');
+      // Success notification
+      const successDiv = document.createElement('div');
+      successDiv.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50';
+      successDiv.textContent = 'Official account created successfully!';
+      document.body.appendChild(successDiv);
+      setTimeout(() => successDiv.remove(), 3000);
+      
       setShowOfficialModal(false);
       resetOfficialForm();
-      // fetchOfficials(); // Commented out since we're using profiles table
+      fetchOfficials();
     } catch (error: any) {
-      alert(`Error creating official: ${error.message}`);
+      console.error('Error creating official:', error);
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50';
+      errorDiv.textContent = `Error creating official: ${error.message}`;
+      document.body.appendChild(errorDiv);
+      setTimeout(() => errorDiv.remove(), 5000);
     }
   };
 
@@ -143,16 +174,27 @@ export default function AdminDashboard() {
       .eq('id', editingOfficial.id);
 
     if (!error) {
-      alert('Official updated successfully!');
+      const successDiv = document.createElement('div');
+      successDiv.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50';
+      successDiv.textContent = 'Official updated successfully!';
+      document.body.appendChild(successDiv);
+      setTimeout(() => successDiv.remove(), 3000);
+      
       setShowOfficialModal(false);
       setEditingOfficial(null);
       resetOfficialForm();
       fetchOfficials();
+    } else {
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50';
+      errorDiv.textContent = 'Error updating official';
+      document.body.appendChild(errorDiv);
+      setTimeout(() => errorDiv.remove(), 3000);
     }
   };
 
   const handleDeleteOfficial = async (officialId: string) => {
-    if (!confirm('Are you sure you want to delete this official?')) return;
+    if (!window.confirm('Are you sure you want to delete this official?')) return;
 
     const { error } = await supabase
       .from('profiles')
@@ -160,7 +202,18 @@ export default function AdminDashboard() {
       .eq('id', officialId);
 
     if (!error) {
+      const successDiv = document.createElement('div');
+      successDiv.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50';
+      successDiv.textContent = 'Official deleted successfully!';
+      document.body.appendChild(successDiv);
+      setTimeout(() => successDiv.remove(), 3000);
       fetchOfficials();
+    } else {
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50';
+      errorDiv.textContent = 'Error deleting official';
+      document.body.appendChild(errorDiv);
+      setTimeout(() => errorDiv.remove(), 3000);
     }
   };
 
@@ -232,7 +285,11 @@ export default function AdminDashboard() {
 
   const handleRejection = async () => {
     if (!applicationToReject || !rejectionReason.trim()) {
-      alert('Please provide a reason for rejection');
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50';
+      errorDiv.textContent = 'Please provide a reason for rejection';
+      document.body.appendChild(errorDiv);
+      setTimeout(() => errorDiv.remove(), 3000);
       return;
     }
 
@@ -254,10 +311,21 @@ export default function AdminDashboard() {
           updated_by: 'admin'
         }]);
 
+      const successDiv = document.createElement('div');
+      successDiv.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50';
+      successDiv.textContent = 'Application rejected successfully';
+      document.body.appendChild(successDiv);
+      setTimeout(() => successDiv.remove(), 3000);
       fetchApplications();
       setShowRejectionModal(false);
       setRejectionReason('');
       setApplicationToReject(null);
+    } else {
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50';
+      errorDiv.textContent = 'Error rejecting application';
+      document.body.appendChild(errorDiv);
+      setTimeout(() => errorDiv.remove(), 3000);
     }
   };
 
@@ -655,6 +723,8 @@ export default function AdminDashboard() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Employee ID</label>
                 <input
+                  id="employee_id"
+                  name="employee_id"
                   type="text"
                   value={officialFormData.employee_id}
                   onChange={(e) => setOfficialFormData({...officialFormData, employee_id: e.target.value})}
@@ -665,6 +735,8 @@ export default function AdminDashboard() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
                 <input
+                  id="first_name"
+                  name="first_name"
                   type="text"
                   value={officialFormData.first_name}
                   onChange={(e) => setOfficialFormData({...officialFormData, first_name: e.target.value})}
@@ -675,6 +747,8 @@ export default function AdminDashboard() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
                 <input
+                  id="last_name"
+                  name="last_name"
                   type="text"
                   value={officialFormData.last_name}
                   onChange={(e) => setOfficialFormData({...officialFormData, last_name: e.target.value})}
@@ -685,6 +759,8 @@ export default function AdminDashboard() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                 <input
+                  id="email"
+                  name="email"
                   type="email"
                   value={officialFormData.email}
                   onChange={(e) => setOfficialFormData({...officialFormData, email: e.target.value})}
@@ -695,6 +771,8 @@ export default function AdminDashboard() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
                 <input
+                  id="phone"
+                  name="phone"
                   type="tel"
                   value={officialFormData.phone}
                   onChange={(e) => setOfficialFormData({...officialFormData, phone: e.target.value})}
@@ -705,6 +783,8 @@ export default function AdminDashboard() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">District</label>
                 <select
+                  id="district"
+                  name="district"
                   value={officialFormData.district}
                   onChange={(e) => setOfficialFormData({...officialFormData, district: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -719,6 +799,8 @@ export default function AdminDashboard() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Position</label>
                 <input
+                  id="position"
+                  name="position"
                   type="text"
                   value={officialFormData.position}
                   onChange={(e) => setOfficialFormData({...officialFormData, position: e.target.value})}
@@ -730,6 +812,8 @@ export default function AdminDashboard() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
                   <input
+                    id="password"
+                    name="password"
                     type="password"
                     value={officialFormData.password}
                     onChange={(e) => setOfficialFormData({...officialFormData, password: e.target.value})}
@@ -894,6 +978,8 @@ export default function AdminDashboard() {
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Reject Application</h3>
             <p className="text-gray-600 mb-4">Please provide a reason for rejecting this application:</p>
             <textarea
+              id="rejection_reason"
+              name="rejection_reason"
               value={rejectionReason}
               onChange={(e) => setRejectionReason(e.target.value)}
               rows={4}
