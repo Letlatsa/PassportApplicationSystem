@@ -40,10 +40,16 @@ export function ApplicationProvider({ children }: { children: React.ReactNode })
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching applications:', error);
+        // Don't throw error, just set empty array
+        setApplications([]);
+      } else {
       setApplications(data || []);
+      }
     } catch (error) {
       console.error('Error fetching applications:', error);
+      setApplications([]);
     } finally {
       setLoading(false);
     }

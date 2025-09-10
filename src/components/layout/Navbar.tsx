@@ -6,7 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useState } from 'react';
 
 export default function Navbar() {
-  const { user, signOut, isAdmin, isOfficial } = useAuth();
+  const { user, signOut, isAdmin } = useAuth();
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -77,18 +77,6 @@ export default function Navbar() {
                     Admin
                   </Link>
                 )}
-                {isOfficial && (
-                  <Link
-                    to="/official"
-                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      isActive('/official') 
-                        ? 'bg-green-100 text-green-700' 
-                        : 'text-green-600 hover:text-green-700'
-                    }`}
-                  >
-                    Official
-                  </Link>
-                )}
                 <div className="flex items-center space-x-4">
                   <div className="flex items-center space-x-2 text-gray-700">
                     <User className="h-4 w-4" />
@@ -126,6 +114,7 @@ export default function Navbar() {
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="text-gray-700 hover:text-blue-600 focus:outline-none"
+              aria-label="Toggle navigation menu"
             >
               <Menu className="h-6 w-6" />
             </button>
@@ -183,19 +172,6 @@ export default function Navbar() {
                     onClick={() => setIsMenuOpen(false)}
                   >
                     Admin
-                  </Link>
-                )}
-                {isOfficial && (
-                  <Link
-                    to="/official"
-                    className={`block px-3 py-2 rounded-md text-base font-medium ${
-                      isActive('/official') 
-                        ? 'bg-green-100 text-green-700' 
-                        : 'text-green-600 hover:text-green-700'
-                    }`}
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    Official
                   </Link>
                 )}
                 <div className="border-t border-gray-200 pt-3 mt-3">

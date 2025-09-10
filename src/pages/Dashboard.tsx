@@ -26,6 +26,16 @@ export default function Dashboard() {
   const hasActiveApplication = applications.some(app => 
     ['submitted', 'under_review', 'approved'].includes(app.status)
   );
+  
+  // Add error handling for missing data
+  const safeApplications = applications || [];
+  const safeStats = {
+    total: safeApplications.length,
+    submitted: safeApplications.filter(app => app.status === 'submitted').length,
+    under_review: safeApplications.filter(app => app.status === 'under_review').length,
+    ready: safeApplications.filter(app => app.status === 'ready_for_collection').length,
+    collected: safeApplications.filter(app => app.status === 'collected').length
+  };
 
   const bookAppointment = async () => {
     if (!selectedApplication || !appointmentData.date || !appointmentData.time || !appointmentData.reference_number) {
@@ -53,18 +63,7 @@ export default function Dashboard() {
     app.last_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const getStatusStats = () => {
-    const stats = {
-      total: applications.length,
-      submitted: applications.filter(app => app.status === 'submitted').length,
-      under_review: applications.filter(app => app.status === 'under_review').length,
-      ready: applications.filter(app => app.status === 'ready_for_collection').length,
-      collected: applications.filter(app => app.status === 'collected').length
-    };
-    return stats;
-  };
-
-  const stats = getStatusStats();
+  const stats = safeStats;
 
   if (loading) {
     return (
