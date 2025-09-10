@@ -66,14 +66,21 @@ export default function OfficialDashboard() {
     if (!user) return;
 
     const { data, error } = await supabase
-      .from('officials')
+      .from('profiles')
       .select('*')
       .eq('user_id', user.id)
-      .eq('is_active', true)
+      .eq('role', 'staff')
       .single();
 
     if (data) {
-      setOfficial(data);
+      // Map profile to official format
+      setOfficial({
+        id: data.id,
+        first_name: data.first_name,
+        last_name: data.last_name,
+        district: data.district,
+        employee_id: data.national_id
+      });
     }
     setLoading(false);
   };
