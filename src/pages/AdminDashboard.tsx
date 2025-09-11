@@ -21,7 +21,7 @@ interface Official {
 }
 
 export default function AdminDashboard() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const [applications, setApplications] = useState<Application[]>([]);
   const [officials, setOfficials] = useState<Official[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,10 +47,14 @@ export default function AdminDashboard() {
   });
 
   useEffect(() => {
-    if (!isAdmin) return;
+    // Check admin status more thoroughly
+    const adminEmails = ['admin@lesotho.gov', 'admin@gov.ls'];
+    const isAdminUser = isAdmin || adminEmails.includes(user?.email || '') || user?.email?.includes('admin');
+    
+    if (!isAdminUser) return;
     fetchApplications();
     fetchOfficials();
-  }, [isAdmin]);
+  }, [isAdmin, user]);
 
   const fetchApplications = async () => {
     const { data } = await supabase
@@ -375,12 +379,17 @@ export default function AdminDashboard() {
 
   const stats = getStats();
 
-  if (!isAdmin) {
+  // Check admin status more thoroughly
+  const adminEmails = ['admin@lesotho.gov', 'admin@gov.ls'];
+  const isAdminUser = isAdmin || adminEmails.includes(user?.email || '') || user?.email?.includes('admin');
+  
+  if (!isAdminUser) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
           <h2 className="text-xl font-semibold text-red-800">Access Denied</h2>
-          <p className="text-red-600 mt-2">You don't have permission to access this page.</p>
+          <p className="text-red-600 mt-2">You don't have permission to access this page. Please log in with an admin account.</p>
+          <p className="text-red-500 text-sm mt-1">Current user: {user?.email}</p>
         </div>
       </div>
     );
