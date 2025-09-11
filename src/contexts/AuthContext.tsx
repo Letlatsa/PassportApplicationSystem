@@ -71,10 +71,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single();
       
       setUserProfile(profile);
-      setIsAdmin(profile?.role === 'admin' || user?.email?.includes('admin') || false);
+      // Check if user is admin based on email or profile role
+      const adminEmails = ['admin@lesotho.gov', 'admin@gov.ls'];
+      const isAdminUser = adminEmails.includes(user?.email || '') || 
+                         profile?.role === 'admin' || 
+                         user?.email?.includes('admin');
+      setIsAdmin(isAdminUser);
     } catch (error) {
       console.error('Error fetching user profile:', error);
-      setIsAdmin(user?.email?.includes('admin') || false);
+      // Fallback admin check if profile fetch fails
+      const adminEmails = ['admin@lesotho.gov', 'admin@gov.ls'];
+      const isAdminUser = adminEmails.includes(user?.email || '') || 
+                         user?.email?.includes('admin');
+      setIsAdmin(isAdminUser);
     }
   };
   const signIn = async (email: string, password: string) => {

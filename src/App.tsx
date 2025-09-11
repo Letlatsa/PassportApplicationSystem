@@ -28,7 +28,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, isAdmin } = useAuth();
   
   if (loading) {
     return (
@@ -38,7 +38,12 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
     );
   }
   
-  return !user ? <>{children}</> : <Navigate to="/dashboard" />;
+  // Redirect authenticated users to appropriate dashboard
+  if (user) {
+    return <Navigate to={isAdmin ? "/admin" : "/dashboard"} />;
+  }
+  
+  return <>{children}</>;
 }
 
 function App() {
