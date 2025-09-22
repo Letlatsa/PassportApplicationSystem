@@ -5,14 +5,16 @@ import { useAuth } from '../contexts/AuthContext';
 import { useApplications } from '../contexts/ApplicationContext';
 import ApplicationCard from '../components/dashboard/ApplicationCard';
 import StatusTimeline from '../components/dashboard/StatusTimeline';
-import { supabase } from '../lib/supabase';
+import type { Database } from '../lib/supabase';
+
+type Application = Database['public']['Tables']['passport_applications']['Row'];
 
 export default function Dashboard() {
   const { user } = useAuth();
   const { applications, loading, refreshApplications } = useApplications();
   const [searchTerm, setSearchTerm] = useState('');
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
-  const [selectedApplication, setSelectedApplication] = useState<any>(null);
+  const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
   const [appointmentData, setAppointmentData] = useState({
     date: '',
     time: '',
@@ -54,6 +56,7 @@ export default function Dashboard() {
       setShowAppointmentModal(false);
       setAppointmentData({ date: '', time: '', reference_number: '' });
     } catch (error) {
+      console.error('Error booking appointment:', error);
       alert('Error booking appointment. Please try again.');
     }
   };
@@ -162,8 +165,10 @@ export default function Dashboard() {
               <button
                 onClick={() => {
                   const approvedApp = applications.find(app => app.status === 'approved');
-                  setSelectedApplication(approvedApp);
-                  setShowAppointmentModal(true);
+                  if (approvedApp) {
+                    setSelectedApplication(approvedApp);
+                    setShowAppointmentModal(true);
+                  }
                 }}
                 className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center"
               >
