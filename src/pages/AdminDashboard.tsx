@@ -128,7 +128,7 @@ export default function AdminDashboard() {
       // Create profile record
       const { error: officialError } = await supabase
         .from('profiles')
-        .insert([{
+        .insert([{ 
           user_id: authData.user?.id || crypto.randomUUID(),
           first_name: officialFormData.first_name,
           last_name: officialFormData.last_name,
@@ -152,11 +152,15 @@ export default function AdminDashboard() {
       setShowOfficialModal(false);
       resetOfficialForm();
       fetchOfficials();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating official:', error);
       const errorDiv = document.createElement('div');
       errorDiv.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50';
-      errorDiv.textContent = `Error creating official: ${error.message}`;
+      if (error instanceof Error) {
+        errorDiv.textContent = `Error creating official: ${error.message}`;
+      } else {
+        errorDiv.textContent = 'An unknown error occurred while creating the official.';
+      }
       document.body.appendChild(errorDiv);
       setTimeout(() => errorDiv.remove(), 5000);
     }
@@ -258,8 +262,8 @@ export default function AdminDashboard() {
 
     const { error } = await supabase
       .from('passport_applications')
-      .update({ 
-        status: newStatus as any,
+      .update({
+        status: newStatus as Application['status'],
         updated_at: new Date().toISOString(),
         qr_code: newStatus === 'ready_for_collection' ? `QR-${id.slice(-8)}` : null
       })
@@ -268,7 +272,7 @@ export default function AdminDashboard() {
     if (!error) {
       await supabase
         .from('application_status_updates')
-        .insert([{
+        .insert([{ 
           application_id: id,
           status: newStatus,
           notes: `Status updated to ${newStatus}`,
@@ -299,7 +303,7 @@ export default function AdminDashboard() {
 
     const { error } = await supabase
       .from('passport_applications')
-      .update({ 
+      .update({
         status: 'rejected',
         updated_at: new Date().toISOString()
       })
@@ -308,7 +312,7 @@ export default function AdminDashboard() {
     if (!error) {
       await supabase
         .from('application_status_updates')
-        .insert([{
+        .insert([{ 
           application_id: applicationToReject,
           status: 'rejected',
           notes: rejectionReason,
@@ -423,7 +427,7 @@ export default function AdminDashboard() {
           <nav className="-mb-px flex space-x-8">
             <button
               onClick={() => setActiveTab('applications')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${ 
                 activeTab === 'applications'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -433,7 +437,7 @@ export default function AdminDashboard() {
             </button>
             <button
               onClick={() => setActiveTab('officials')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${ 
                 activeTab === 'officials'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -569,14 +573,14 @@ export default function AdminDashboard() {
                         <div className="text-sm font-mono text-gray-900">{application.reference_number}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${ 
                           application.status === 'submitted' ? 'bg-blue-100 text-blue-800' :
                           application.status === 'under_review' ? 'bg-yellow-100 text-yellow-800' :
                           application.status === 'approved' ? 'bg-green-100 text-green-800' :
                           application.status === 'ready_for_collection' ? 'bg-purple-100 text-purple-800' :
                           application.status === 'collected' ? 'bg-emerald-100 text-emerald-800' :
                           'bg-red-100 text-red-800'
-                        }`}>
+                        }`}> 
                           {application.status.replace('_', ' ')}
                         </span>
                       </td>
@@ -679,9 +683,9 @@ export default function AdminDashboard() {
                         <div className="text-sm text-gray-900">{official.position}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${ 
                           official.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                        }`}>
+                        }`}> 
                           {official.is_active ? 'Active' : 'Inactive'}
                         </span>
                       </td>

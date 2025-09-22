@@ -110,7 +110,7 @@ export function ApplicationProvider({ children }: { children: React.ReactNode })
     if (user) {
       refreshApplications();
     }
-  }, [user]);
+  }, [user?.id]);
 
   const value = {
     applications,

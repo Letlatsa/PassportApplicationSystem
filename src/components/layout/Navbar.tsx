@@ -3,12 +3,18 @@ import { Link, useLocation } from 'react-router-dom';
 import { User, LogOut, Menu } from 'lucide-react';
 import CoatOfArms from '../../CoatOfArms.png';
 import { useAuth } from '../../contexts/AuthContext';
+import { useApplications } from '../../contexts/ApplicationContext';
 import { useState } from 'react';
 
 export default function Navbar() {
   const { user, signOut, isAdmin } = useAuth();
+  const { applications } = useApplications();
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  const hasActiveApplication = applications.some(app => 
+    ['submitted', 'under_review', 'approved'].includes(app.status)
+  );
 
   const handleSignOut = async () => {
     await signOut();
@@ -46,15 +52,27 @@ export default function Navbar() {
                   Dashboard
                 </Link>
                 <Link
-                  to="/apply"
+                  to="/profile"
                   className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    isActive('/apply') 
+                    isActive('/profile') 
                       ? 'bg-blue-100 text-blue-700' 
                       : 'text-gray-700 hover:text-blue-600'
                   }`}
                 >
-                  Apply
+                  Profile
                 </Link>
+                {!hasActiveApplication && (
+                  <Link
+                    to="/apply"
+                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      isActive('/apply') 
+                        ? 'bg-blue-100 text-blue-700' 
+                        : 'text-gray-700 hover:text-blue-600'
+                    }`}
+                  >
+                    Apply
+                  </Link>
+                )}
                 <Link
                   to="/collection-points"
                   className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -140,16 +158,29 @@ export default function Navbar() {
                   Dashboard
                 </Link>
                 <Link
-                  to="/apply"
+                  to="/profile"
                   className={`block px-3 py-2 rounded-md text-base font-medium ${
-                    isActive('/apply') 
+                    isActive('/profile') 
                       ? 'bg-blue-100 text-blue-700' 
                       : 'text-gray-700 hover:text-blue-600'
                   }`}
                   onClick={() => setIsMenuOpen(false)}
                 >
-                  Apply
+                  Profile
                 </Link>
+                {!hasActiveApplication && (
+                  <Link
+                    to="/apply"
+                    className={`block px-3 py-2 rounded-md text-base font-medium ${
+                      isActive('/apply') 
+                        ? 'bg-blue-100 text-blue-700' 
+                        : 'text-gray-700 hover:text-blue-600'
+                    }`}
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Apply
+                  </Link>
+                )}
                 <Link
                   to="/collection-points"
                   className={`block px-3 py-2 rounded-md text-base font-medium ${

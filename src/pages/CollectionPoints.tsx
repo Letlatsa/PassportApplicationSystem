@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Phone, Clock, CheckCircle } from 'lucide-react';
+import { MapPin, Phone, User, CheckCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface CollectionPoint {
@@ -7,8 +7,8 @@ interface CollectionPoint {
   name: string;
   address: string;
   district: string;
-  phone: string;
-  operating_hours: string;
+  contact_phone: string;
+  contact_person: string;
   is_active: boolean;
 }
 
@@ -28,8 +28,11 @@ export default function CollectionPoints() {
       .eq('is_active', true)
       .order('district', { ascending: true });
 
-    if (data) {
-      setCollectionPoints(data);
+    if (error) {
+      console.error("Error fetching collection points:", error);
+      setCollectionPoints([]);
+    } else {
+      setCollectionPoints(data || []);
     }
     setLoading(false);
   };
@@ -105,20 +108,24 @@ export default function CollectionPoints() {
                     
                     <div className="flex items-center">
                       <Phone className="w-4 h-4 mr-2 text-gray-400" />
-                      <span className="text-sm">{point.phone}</span>
+                      <span className="text-sm">{point.contact_phone}</span>
                     </div>
                     
                     <div className="flex items-center">
-                      <Clock className="w-4 h-4 mr-2 text-gray-400" />
-                      <span className="text-sm">{point.operating_hours}</span>
+                      <User className="w-4 h-4 mr-2 text-gray-400" />
+                      <span className="text-sm">{point.contact_person}</span>
                     </div>
                   </div>
                 </div>
 
                 <div className="mt-4 lg:mt-0 lg:ml-6">
-                  <button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors">
-                    Select This Point
-                  </button>
+                  <a
+                    href={`tel:${point.contact_phone}`}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors flex items-center"
+                  >
+                    <Phone className="w-4 h-4 mr-2" />
+                    Call District Office
+                  </a>
                 </div>
               </div>
             </div>

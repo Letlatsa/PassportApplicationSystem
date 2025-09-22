@@ -12,6 +12,7 @@ import CollectionPoints from './pages/CollectionPoints';
 import AdminDashboard from './pages/AdminDashboard';
 import OfficialDashboard from './pages/OfficialDashboard';
 import CollectionInterface from './pages/CollectionInterface';
+import Profile from './pages/Profile';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -60,6 +61,7 @@ function App() {
                 <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
                 <Route path="/apply" element={<ProtectedRoute><Apply /></ProtectedRoute>} />
                 <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                 <Route path="/collection-points" element={<ProtectedRoute><CollectionPoints /></ProtectedRoute>} />
                 <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
                 <Route path="/official" element={<ProtectedRoute><OfficialDashboard /></ProtectedRoute>} />
