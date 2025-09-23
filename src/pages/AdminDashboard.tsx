@@ -260,7 +260,7 @@ export default function AdminDashboard() {
       return;
     }
 
-    const { error } = await supabase
+    const { error: updateError } = await supabase
       .from('passport_applications')
       .update({
         status: newStatus as Application['status'],
@@ -269,24 +269,50 @@ export default function AdminDashboard() {
       })
       .eq('id', id);
 
-    if (!error) {
-      await supabase
-        .from('application_status_updates')
-        .insert([{ 
-          application_id: id,
-          status: newStatus,
-          notes: `Status updated to ${newStatus}`,
-          updated_by: 'admin'
-        }]);
+    if (updateError) {
+      console.error('Error updating application status:', JSON.stringify(updateError, null, 2));
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50';
+      errorDiv.textContent = `Error updating status: ${updateError.message || 'Check console for details.'}`;
+      document.body.appendChild(errorDiv);
+      setTimeout(() => errorDiv.remove(), 5000);
+      return;
+    }
 
-      // Send approval email if approved
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.error('Error: No authenticated user found for logging status update.');
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50';
+      errorDiv.textContent = 'Could not find authenticated user to log status update.';
+      document.body.appendChild(errorDiv);
+      setTimeout(() => errorDiv.remove(), 5000);
+      return;
+    }
+
+    const { error: logError } = await supabase
+      .from('application_status_updates')
+      .insert([{ 
+        application_id: id,
+        status: newStatus,
+        notes: `Status updated to ${newStatus}`,
+        updated_by: user.id
+      }]);
+
+    if (logError) {
+      console.error('Error logging status update:', JSON.stringify(logError, null, 2));
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50';
+      errorDiv.textContent = `Error logging status update: ${logError.message || 'Check console for details.'}`;
+      document.body.appendChild(errorDiv);
+      setTimeout(() => errorDiv.remove(), 5000);
+    } else {
       if (newStatus === 'approved') {
         const application = applications.find(app => app.id === id);
         if (application) {
           await sendApprovalEmail(application);
         }
       }
-
       fetchApplications();
     }
   };
@@ -301,7 +327,7 @@ export default function AdminDashboard() {
       return;
     }
 
-    const { error } = await supabase
+    const { error: updateError } = await supabase
       .from('passport_applications')
       .update({
         status: 'rejected',
@@ -309,16 +335,44 @@ export default function AdminDashboard() {
       })
       .eq('id', applicationToReject);
 
-    if (!error) {
-      await supabase
-        .from('application_status_updates')
-        .insert([{ 
-          application_id: applicationToReject,
-          status: 'rejected',
-          notes: rejectionReason,
-          updated_by: 'admin'
-        }]);
+    if (updateError) {
+      console.error('Error rejecting application:', JSON.stringify(updateError, null, 2));
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50';
+      errorDiv.textContent = `Error rejecting application: ${updateError.message || 'Check console for details.'}`;
+      document.body.appendChild(errorDiv);
+      setTimeout(() => errorDiv.remove(), 5000);
+      return;
+    }
+    
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.error('Error: No authenticated user found for logging rejection.');
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50';
+      errorDiv.textContent = 'Could not find authenticated user to log rejection.';
+      document.body.appendChild(errorDiv);
+      setTimeout(() => errorDiv.remove(), 5000);
+      return;
+    }
 
+    const { error: logError } = await supabase
+      .from('application_status_updates')
+      .insert([{ 
+        application_id: applicationToReject,
+        status: 'rejected',
+        notes: rejectionReason,
+        updated_by: user.id
+      }]);
+
+    if (logError) {
+      console.error('Error logging rejection:', JSON.stringify(logError, null, 2));
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50';
+      errorDiv.textContent = `Error logging rejection: ${logError.message || 'Check console for details.'}`;
+      document.body.appendChild(errorDiv);
+      setTimeout(() => errorDiv.remove(), 5000);
+    } else {
       const successDiv = document.createElement('div');
       successDiv.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50';
       successDiv.textContent = 'Application rejected successfully';
@@ -328,12 +382,6 @@ export default function AdminDashboard() {
       setShowRejectionModal(false);
       setRejectionReason('');
       setApplicationToReject(null);
-    } else {
-      const errorDiv = document.createElement('div');
-      errorDiv.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50';
-      errorDiv.textContent = 'Error rejecting application';
-      document.body.appendChild(errorDiv);
-      setTimeout(() => errorDiv.remove(), 3000);
     }
   };
 
