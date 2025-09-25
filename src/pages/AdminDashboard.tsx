@@ -32,6 +32,7 @@ export default function AdminDashboard() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [showRejectionModal, setShowRejectionModal] = useState(false);
   const [applicationToReject, setApplicationToReject] = useState<string | null>(null);
+  const [collectionPointName, setCollectionPointName] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'applications' | 'officials'>('applications');
   const [showOfficialModal, setShowOfficialModal] = useState(false);
   const [editingOfficial, setEditingOfficial] = useState<Official | null>(null);
@@ -385,6 +386,18 @@ export default function AdminDashboard() {
     }
   };
 
+  const fetchCollectionPointName = async (id: string) => {
+    const { data } = await supabase
+      .from('collection_points')
+      .select('name')
+      .eq('id', id)
+      .single();
+    
+    if (data) {
+      setCollectionPointName(data.name);
+    }
+  };
+
   const sendApprovalEmail = async (application: Application) => {
     try {
       await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-approval-email`, {
@@ -406,6 +419,9 @@ export default function AdminDashboard() {
 
   const viewApplication = (application: Application) => {
     setSelectedApplication(application);
+    if (application.collection_point_id) {
+      fetchCollectionPointName(application.collection_point_id);
+    }
     setShowApplicationModal(true);
   };
 
@@ -922,7 +938,10 @@ export default function AdminDashboard() {
                   Application Details - {selectedApplication.reference_number}
                 </h3>
                 <button
-                  onClick={() => setShowApplicationModal(false)}
+                  onClick={() => {
+                    setShowApplicationModal(false);
+                    setCollectionPointName(null);
+                  }}
                   className="text-gray-400 hover:text-gray-600"
                 >
                   <X className="w-6 h-6" />
@@ -942,6 +961,7 @@ export default function AdminDashboard() {
                   <div><span className="font-medium">Email:</span> {selectedApplication.email}</div>
                   <div><span className="font-medium">Phone:</span> {selectedApplication.phone}</div>
                   <div className="col-span-2"><span className="font-medium">Address:</span> {selectedApplication.address}</div>
+                  <div className="col-span-2"><span className="font-medium">Collection Point:</span> {collectionPointName}</div>
                 </div>
               </div>
 
