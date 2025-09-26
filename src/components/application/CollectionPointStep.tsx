@@ -18,6 +18,8 @@ interface CollectionPointStepProps {
   updateFormData: (data: ApplicationFormData & { collectionPointId?: string }) => void;
   onNext: () => void;
   onPrev: () => void;
+  isFirst?: boolean;
+  isLast?: boolean;
 }
 
 export default function CollectionPointStep({ formData, updateFormData, onNext, onPrev }: CollectionPointStepProps) {

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { FileText, Users, MapPin, TrendingUp, Search, Filter, Plus, Edit, Trash2, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { FileText, Users, MapPin, TrendingUp, Search, Filter, Plus, X, Calendar } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { Database } from '../lib/supabase';
@@ -20,9 +20,31 @@ interface Official {
   created_at: string;
 }
 
+type RawProfile = {
+  id: string;
+  user_id?: string;
+  national_id?: string;
+  first_name?: string;
+  last_name?: string;
+  phone_number?: string;
+  district?: string;
+  created_at?: string;
+};
+
 export default function AdminDashboard() {
   const { isAdmin, user } = useAuth();
   const [applications, setApplications] = useState<Application[]>([]);
+  const [appointments, setAppointments] = useState<Array<{
+    id: string;
+    application_id: string;
+    user_id: string;
+    reference_number: string;
+    date: string;
+    time: string;
+    created_at: string;
+    passport_application?: { reference_number?: string; first_name?: string; last_name?: string; user_id?: string };
+  }>>([]);
+  const [appointmentsError, setAppointmentsError] = useState<string | null>(null);
   const [officials, setOfficials] = useState<Official[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -33,7 +55,7 @@ export default function AdminDashboard() {
   const [showRejectionModal, setShowRejectionModal] = useState(false);
   const [applicationToReject, setApplicationToReject] = useState<string | null>(null);
   const [collectionPointName, setCollectionPointName] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'applications' | 'officials'>('applications');
+  const [activeTab, setActiveTab] = useState<'applications' | 'officials' | 'appointments'>('applications');
   const [showOfficialModal, setShowOfficialModal] = useState(false);
   const [editingOfficial, setEditingOfficial] = useState<Official | null>(null);
   const [officialFormData, setOfficialFormData] = useState({
@@ -54,6 +76,7 @@ export default function AdminDashboard() {
     
     if (!isAdminUser) return;
     fetchApplications();
+    fetchAppointments();
     fetchOfficials();
   }, [isAdmin, user]);
 
@@ -66,6 +89,58 @@ export default function AdminDashboard() {
     setApplications(data || []);
     setLoading(false);
   };
+  
+  const fetchAppointments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('biometrics_appointments')
+        .select(`
+          id,
+          application_id,
+          user_id,
+          reference_number,
+          date,
+          time,
+          created_at,
+          passport_applications (id, reference_number, first_name, last_name, user_id)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const mapped = (data || []).map((row: unknown) => {
+        const r = row as Record<string, unknown>;
+        const passportApp = (r['passport_applications'] ?? r['passport_application']) as Record<string, unknown> | null;
+        return {
+          id: typeof r['id'] === 'string' ? r['id'] : String(r['id'] ?? ''),
+          application_id: typeof r['application_id'] === 'string' ? r['application_id'] : String(r['application_id'] ?? ''),
+          user_id: typeof r['user_id'] === 'string' ? r['user_id'] : String(r['user_id'] ?? ''),
+          reference_number: typeof r['reference_number'] === 'string' ? r['reference_number'] : String(r['reference_number'] ?? ''),
+          date: typeof r['date'] === 'string' ? r['date'] : String(r['date'] ?? ''),
+          time: typeof r['time'] === 'string' ? r['time'] : String(r['time'] ?? ''),
+          created_at: typeof r['created_at'] === 'string' ? r['created_at'] : String(r['created_at'] ?? ''),
+          passport_application: passportApp
+            ? {
+                reference_number: typeof passportApp['reference_number'] === 'string' ? passportApp['reference_number'] : undefined,
+                first_name: typeof passportApp['first_name'] === 'string' ? passportApp['first_name'] : undefined,
+                last_name: typeof passportApp['last_name'] === 'string' ? passportApp['last_name'] : undefined,
+                user_id: typeof passportApp['user_id'] === 'string' ? passportApp['user_id'] : undefined,
+              }
+            : undefined,
+        };
+      });
+
+      console.debug('fetchAppointments: success, rows:', mapped.length, { raw: data });
+      setAppointments(mapped);
+      setAppointmentsError(null);
+    } catch (err: unknown) {
+      let msg = String(err);
+      if (err instanceof Error) msg = err.message;
+      console.warn('Could not fetch appointments (table or RLS may not allow access):', err);
+      setAppointments([]);
+      setAppointmentsError(msg || 'Could not load appointments. Ensure the biometrics_appointments table exists and RLS policies allow admin access.');
+    }
+  };
 
   const fetchOfficials = async () => {
     const { data } = await supabase
@@ -74,21 +149,25 @@ export default function AdminDashboard() {
       .eq('role', 'staff')
       .order('created_at', { ascending: false });
 
-    // Map profiles to officials format
-    const mappedOfficials = (data || []).map(profile => ({
-      id: profile.id,
-      user_id: profile.user_id,
-      employee_id: profile.national_id,
-      first_name: profile.first_name,
-      last_name: profile.last_name,
-      email: `${profile.first_name.toLowerCase()}.${profile.last_name.toLowerCase()}@gov.ls`,
-      phone: profile.phone_number,
-      district: profile.district,
-      position: 'Passport Officer',
-      is_active: true,
-      created_at: profile.created_at
-    }));
-    
+    // Map profiles to officials format (provide safe defaults so types align)
+    const mappedOfficials: Official[] = (data || []).map((profile: RawProfile) => {
+      const first = (profile.first_name ?? '').trim();
+      const last = (profile.last_name ?? '').trim();
+      return {
+        id: profile.id,
+        user_id: profile.user_id ?? '',
+        employee_id: profile.national_id ?? '',
+        first_name: first,
+        last_name: last,
+        email: `${first.toLowerCase() || 'unknown'}.${last.toLowerCase() || 'user'}@gov.ls`,
+        phone: profile.phone_number ?? '',
+        district: profile.district ?? '',
+        position: 'Passport Officer',
+        is_active: true,
+        created_at: profile.created_at ?? ''
+      };
+    });
+
     setOfficials(mappedOfficials);
   };
 
@@ -433,7 +512,8 @@ export default function AdminDashboard() {
       approved: applications.filter(app => app.status === 'approved').length,
       ready: applications.filter(app => app.status === 'ready_for_collection').length,
       collected: applications.filter(app => app.status === 'collected').length,
-      rejected: applications.filter(app => app.status === 'rejected').length
+      rejected: applications.filter(app => app.status === 'rejected').length,
+      appointments: appointments.length
     };
   };
 
@@ -446,6 +526,91 @@ export default function AdminDashboard() {
   });
 
   const stats = getStats();
+
+  // safe accessor for optional fields on Application rows (avoids TS errors)
+  const getAppField = (app: Application | null, key: string): string | undefined => {
+    if (!app) return undefined;
+    const r = app as unknown as Record<string, unknown>;
+    const v = r[key];
+    return typeof v === 'string' ? v : undefined;
+  };
+
+  // More flexible accessor: tries multiple key names and nested shapes
+  const findAppValue = (app: Application | null, candidates: string[]): string | undefined => {
+    if (!app) return undefined;
+    const r = app as unknown as Record<string, unknown>;
+    for (const k of candidates) {
+      const v = r[k];
+      if (typeof v === 'string' && v.trim()) return v;
+      if (typeof v === 'number') return String(v);
+      if (Array.isArray(v) && v.length) return JSON.stringify(v);
+      if (typeof v === 'object' && v !== null) {
+        // if nested object contains a string value for a reasonable key, return first string
+        const nested = v as Record<string, unknown>;
+        for (const nk of Object.keys(nested)) {
+          const nv = nested[nk];
+          if (typeof nv === 'string' && nv.trim()) return nv;
+        }
+      }
+    }
+
+    // try a case-insensitive key match as a last resort
+    const lower = Object.keys(r).find(k => candidates.some(c => k.toLowerCase().includes(c.toLowerCase())));
+    if (lower) {
+      const v = r[lower];
+      if (typeof v === 'string') return v;
+      if (typeof v === 'number') return String(v);
+    }
+    return undefined;
+  };
+
+  // Render uploaded documents/attachments for an application, handling a few shapes
+  const getAppDocuments = (app: Application | null): Array<{ name?: string; url: string }> => {
+    if (!app) return [];
+    const r = app as unknown as Record<string, unknown>;
+    const candidateKeys = ['uploaded_documents', 'documents', 'attachments', 'files'];
+    for (const key of candidateKeys) {
+      const v = r[key];
+      if (!v) continue;
+      // if it's already an array
+      if (Array.isArray(v)) {
+        return v.map(item => {
+          if (typeof item === 'string') return { url: item };
+          const obj = item as Record<string, unknown>;
+          return { name: typeof obj.name === 'string' ? obj.name : undefined, url: String(obj.url ?? obj.path ?? obj.file_url ?? obj.key ?? '') };
+        }).filter(d => d.url);
+      }
+      // if it's a JSON string
+      if (typeof v === 'string') {
+        try {
+          const parsed = JSON.parse(v);
+          if (Array.isArray(parsed)) {
+            return parsed.map(item => {
+              if (typeof item === 'string') return { url: item };
+              const obj = item as Record<string, unknown>;
+              return { name: typeof obj.name === 'string' ? obj.name : undefined, url: String(obj.url ?? obj.path ?? obj.file_url ?? obj.key ?? '') };
+            }).filter(d => d.url);
+          }
+        } catch {
+          // not JSON — if the string looks like a URL, use it
+          if (v.startsWith('http') || v.startsWith('/')) return [{ url: v }];
+        }
+      }
+      // if it's an object with keys pointing to files
+      if (typeof v === 'object' && v !== null) {
+        const obj = v as Record<string, unknown>;
+        const urls: Array<{ name?: string; url: string }> = [];
+        for (const k of Object.keys(obj)) {
+          const val = obj[k];
+          if (typeof val === 'string' && (val.startsWith('http') || val.startsWith('/'))) {
+            urls.push({ name: k, url: val });
+          }
+        }
+        if (urls.length) return urls;
+      }
+    }
+    return [];
+  };
 
   // Check admin status more thoroughly
   const adminEmails = ['admin@lesotho.gov', 'admin@gov.ls'];
@@ -498,6 +663,16 @@ export default function AdminDashboard() {
               }`}
             >
               Applications
+            </button>
+            <button
+              onClick={() => setActiveTab('appointments')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${ 
+                activeTab === 'appointments'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <Calendar className="w-4 h-4 inline-block mr-2" /> Appointments
             </button>
             <button
               onClick={() => setActiveTab('officials')}
@@ -579,7 +754,7 @@ export default function AdminDashboard() {
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
-              
+
               <div className="flex items-center space-x-2">
                 <Filter className="w-4 h-4 text-gray-400" />
                 <select
@@ -605,76 +780,87 @@ export default function AdminDashboard() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Applicant
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Reference
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Submitted
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Applicant</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reference</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Appointment</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Submitted</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
+
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredApplications.map((application) => (
-                    <tr key={application.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {application.first_name} {application.last_name}
+                  {filteredApplications.map((application) => {
+                    const appt = appointments.find(a => a.application_id === application.id);
+
+                    return (
+                      <tr key={application.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{application.first_name} {application.last_name}</div>
+                            <div className="text-sm text-gray-500">{application.email}</div>
                           </div>
-                          <div className="text-sm text-gray-500">{application.email}</div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-mono text-gray-900">{application.reference_number}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${ 
-                          application.status === 'submitted' ? 'bg-blue-100 text-blue-800' :
-                          application.status === 'under_review' ? 'bg-yellow-100 text-yellow-800' :
-                          application.status === 'approved' ? 'bg-green-100 text-green-800' :
-                          application.status === 'ready_for_collection' ? 'bg-purple-100 text-purple-800' :
-                          application.status === 'collected' ? 'bg-emerald-100 text-emerald-800' :
-                          'bg-red-100 text-red-800'
-                        }`}> 
-                          {application.status.replace('_', ' ')}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(application.created_at).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => viewApplication(application)}
-                            className="text-blue-600 hover:text-blue-800 text-xs font-medium"
+                        </td>
+
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-mono text-gray-900">{application.reference_number}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {appt ? (
+                            <div className="text-sm text-gray-700">{appt.date ? new Date(appt.date).toLocaleDateString() : '-'} {appt.time ?? ''}</div>
+                          ) : (
+                            <div className="text-sm text-gray-400">No appointment</div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-700">{findAppValue(application, ['district', 'area', 'region', 'ward']) ?? '-'}</div>
+                        </td>
+
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span
+                            className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              application.status === 'submitted' ? 'bg-blue-100 text-blue-800' :
+                              application.status === 'under_review' ? 'bg-yellow-100 text-yellow-800' :
+                              application.status === 'approved' ? 'bg-green-100 text-green-800' :
+                              application.status === 'ready_for_collection' ? 'bg-purple-100 text-purple-800' :
+                              application.status === 'collected' ? 'bg-emerald-100 text-emerald-800' :
+                              'bg-red-100 text-red-800'
+                            }`}
                           >
-                            View
-                          </button>
-                          <select
-                            value={application.status}
-                            onChange={(e) => updateStatus(application.id, e.target.value)}
-                            className="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          >
-                            <option value="submitted">Submitted</option>
-                            <option value="under_review">Under Review</option>
-                            <option value="approved">Approved</option>
-                            <option value="ready_for_collection">Ready for Collection</option>
-                            <option value="collected">Collected</option>
-                            <option value="rejected">Rejected</option>
-                          </select>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                            {application.status.replace('_', ' ')}
+                          </span>
+                        </td>
+
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {new Date(application.created_at).toLocaleDateString()}
+                        </td>
+
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => viewApplication(application)}
+                              className="text-blue-600 hover:text-blue-800 text-xs font-medium"
+                            >
+                              View
+                            </button>
+
+                            <select
+                              value={application.status}
+                              onChange={(e) => updateStatus(application.id, e.target.value)}
+                              className="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                              <option value="submitted">Submitted</option>
+                              <option value="under_review">Under Review</option>
+                              <option value="approved">Approved</option>
+                              <option value="ready_for_collection">Ready for Collection</option>
+                              <option value="collected">Collected</option>
+                              <option value="rejected">Rejected</option>
+                            </select>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -682,74 +868,134 @@ export default function AdminDashboard() {
         </>
       )}
 
-      {activeTab === 'officials' && (
-        <>
-          {/* Officials Header */}
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Officials Management</h2>
-            <button
-              onClick={() => {
-                resetOfficialForm();
-                setEditingOfficial(null);
-                setShowOfficialModal(true);
-              }}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors flex items-center"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Add Official
-            </button>
+      {activeTab === 'appointments' && (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="p-6 border-b">
+            <h2 className="text-2xl font-bold">Biometrics Appointments</h2>
+            <p className="text-sm text-gray-600 mt-1">List of all booked biometrics appointments</p>
+            <p className="text-xs text-gray-400 mt-2">Debug: fetched {appointments.length} rows. {appointmentsError ? `Error: ${appointmentsError}` : ''}</p>
           </div>
+          <div className="p-6">
+            {appointmentsError ? (
+              <div className="text-sm text-red-600">{appointmentsError}</div>
+            ) : appointments.length === 0 ? (
+              <div className="text-sm text-gray-500">No appointments found.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Reference</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Applicant</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Date</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Time</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Booked At</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {appointments.map((a) => (
+                      <tr key={a.id}>
+                        <td className="px-4 py-2 text-sm font-mono">
+                          {a.reference_number || a.passport_application?.reference_number || '-'}
+                        </td>
+                        <td className="px-4 py-2 text-sm">
+                          {a.passport_application
+                            ? `${a.passport_application.first_name ?? ''} ${a.passport_application.last_name ?? ''}`.trim()
+                            : (a.user_id ?? '-')}
+                        </td>
+                        <td className="px-4 py-2 text-sm">{a.date ? new Date(a.date).toLocaleDateString() : '-'}</td>
+                        <td className="px-4 py-2 text-sm">{a.time ?? '-'}</td>
+                        <td className="px-4 py-2 text-sm text-gray-500">{a.created_at ? new Date(a.created_at).toLocaleString() : '-'}</td>
+                        <td className="px-4 py-2 text-sm">
+                          <button
+                            onClick={() => { /* future: navigate to application or mark attended */ }}
+                            className="text-blue-600 hover:text-blue-800 text-xs font-medium"
+                          >
+                            View
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
-          {/* Officials Table */}
-          <div className="bg-white rounded-lg shadow overflow-hidden">
+      {activeTab === 'officials' && (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="p-6 border-b">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold">Officials Management</h2>
+              <button
+                onClick={() => setShowOfficialModal(true)}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700 transition-all"
+              >
+                <Plus className="w-4 h-4 inline-block mr-2" /> Add Official
+              </button>
+            </div>
+            <p className="text-sm text-gray-600 mt-1">Manage officials assigned to process passport applications</p>
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Search by name, email..."
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div className="relative">
+                <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <select
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="all">All Officials</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+            </div>
+
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Official
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Employee ID
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      District
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Position
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">District</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {officials.map((official) => (
                     <tr key={official.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {official.first_name} {official.last_name}
-                          </div>
-                          <div className="text-sm text-gray-500">{official.email}</div>
-                        </div>
+                        <div className="text-sm font-medium text-gray-900">{official.first_name} {official.last_name}</div>
+                        <div className="text-sm text-gray-500">{official.position}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-mono text-gray-900">{official.employee_id}</div>
+                        <div className="text-sm font-mono text-gray-900">{official.email}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{official.district}</div>
+                        <div className="text-sm text-gray-500">{official.phone}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{official.position}</div>
+                        <div className="text-sm text-gray-500">{official.district}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${ 
-                          official.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                        }`}> 
+                        <span
+                          className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            official.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                          }`}
+                        >
                           {official.is_active ? 'Active' : 'Inactive'}
                         </span>
                       </td>
@@ -757,16 +1003,14 @@ export default function AdminDashboard() {
                         <div className="flex space-x-2">
                           <button
                             onClick={() => openEditModal(official)}
-                            className="text-blue-600 hover:text-blue-800 text-xs font-medium flex items-center"
+                            className="text-blue-600 hover:text-blue-800 text-xs font-medium"
                           >
-                            <Edit className="w-3 h-3 mr-1" />
                             Edit
                           </button>
                           <button
                             onClick={() => handleDeleteOfficial(official.id)}
-                            className="text-red-600 hover:text-red-800 text-xs font-medium flex items-center"
+                            className="text-red-600 hover:text-red-800 text-xs font-medium"
                           >
-                            <Trash2 className="w-3 h-3 mr-1" />
                             Delete
                           </button>
                         </div>
@@ -777,313 +1021,324 @@ export default function AdminDashboard() {
               </table>
             </div>
           </div>
-        </>
-      )}
-
-      {/* Official Modal */}
-      {showOfficialModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-semibold text-gray-900">
-                {editingOfficial ? 'Edit Official' : 'Add New Official'}
-              </h3>
-              <button
-                onClick={() => setShowOfficialModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Employee ID</label>
-                <input
-                  id="employee_id"
-                  name="employee_id"
-                  type="text"
-                  value={officialFormData.employee_id}
-                  onChange={(e) => setOfficialFormData({...officialFormData, employee_id: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
-                <input
-                  id="first_name"
-                  name="first_name"
-                  type="text"
-                  value={officialFormData.first_name}
-                  onChange={(e) => setOfficialFormData({...officialFormData, first_name: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
-                <input
-                  id="last_name"
-                  name="last_name"
-                  type="text"
-                  value={officialFormData.last_name}
-                  onChange={(e) => setOfficialFormData({...officialFormData, last_name: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  value={officialFormData.email}
-                  onChange={(e) => setOfficialFormData({...officialFormData, email: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                <input
-                  id="phone"
-                  name="phone"
-                  type="tel"
-                  value={officialFormData.phone}
-                  onChange={(e) => setOfficialFormData({...officialFormData, phone: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">District</label>
-                <select
-                  id="district"
-                  name="district"
-                  value={officialFormData.district}
-                  onChange={(e) => setOfficialFormData({...officialFormData, district: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Select District</option>
-                  {districts.map(district => (
-                    <option key={district} value={district}>{district}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Position</label>
-                <input
-                  id="position"
-                  name="position"
-                  type="text"
-                  value={officialFormData.position}
-                  onChange={(e) => setOfficialFormData({...officialFormData, position: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              {!editingOfficial && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                  <input
-                    id="password"
-                    name="password"
-                    type="password"
-                    value={officialFormData.password}
-                    onChange={(e) => setOfficialFormData({...officialFormData, password: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              )}
-            </div>
-            
-            <div className="flex justify-end space-x-3 mt-6">
-              <button
-                onClick={() => setShowOfficialModal(false)}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={editingOfficial ? handleUpdateOfficial : handleCreateOfficial}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors"
-              >
-                {editingOfficial ? 'Update Official' : 'Create Official'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {filteredApplications.length === 0 && (
-        <div className="bg-white rounded-lg shadow p-12 text-center">
-          <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">No Applications Found</h3>
-          <p className="text-gray-600">
-            No applications match your current search and filter criteria.
-          </p>
         </div>
       )}
 
       {/* Application Details Modal */}
       {showApplicationModal && selectedApplication && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex justify-between items-center">
-                <h3 className="text-xl font-semibold text-gray-900">
-                  Application Details - {selectedApplication.reference_number}
-                </h3>
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="bg-white rounded-lg shadow-lg w-full max-w-3xl p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">Application Details</h3>
                 <button
-                  onClick={() => {
-                    setShowApplicationModal(false);
-                    setCollectionPointName(null);
-                  }}
-                  className="text-gray-400 hover:text-gray-600"
+                  onClick={() => setShowApplicationModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
                 >
-                  <X className="w-6 h-6" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
-            </div>
-            
-            <div className="p-6 space-y-6">
-              {/* Personal Information */}
-              <div>
-                <h4 className="text-lg font-semibold text-gray-900 mb-3">Personal Information</h4>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div><span className="font-medium">Name:</span> {selectedApplication.first_name} {selectedApplication.last_name}</div>
-                  <div><span className="font-medium">Date of Birth:</span> {new Date(selectedApplication.date_of_birth).toLocaleDateString()}</div>
-                  <div><span className="font-medium">Place of Birth:</span> {selectedApplication.place_of_birth}</div>
-                  <div><span className="font-medium">Nationality:</span> {selectedApplication.nationality}</div>
-                  <div><span className="font-medium">Email:</span> {selectedApplication.email}</div>
-                  <div><span className="font-medium">Phone:</span> {selectedApplication.phone}</div>
-                  <div className="col-span-2"><span className="font-medium">Address:</span> {selectedApplication.address}</div>
-                  <div className="col-span-2"><span className="font-medium">Collection Point:</span> {collectionPointName}</div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-500">Reference Number</p>
+                  <p className="text-lg font-semibold">{selectedApplication.reference_number}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Status</p>
+                  <span
+                    className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                      selectedApplication.status === 'submitted' ? 'bg-blue-100 text-blue-800' :
+                      selectedApplication.status === 'under_review' ? 'bg-yellow-100 text-yellow-800' :
+                      selectedApplication.status === 'approved' ? 'bg-green-100 text-green-800' :
+                      selectedApplication.status === 'ready_for_collection' ? 'bg-purple-100 text-purple-800' :
+                      selectedApplication.status === 'collected' ? 'bg-emerald-100 text-emerald-800' :
+                      'bg-red-100 text-red-800'
+                    }`}
+                  >
+                    {selectedApplication.status.replace('_', ' ')}
+                  </span>
+                </div>
+
+                <div>
+                  <p className="text-sm text-gray-500">Applicant Name</p>
+                  <p className="text-lg font-semibold">{selectedApplication.first_name} {selectedApplication.last_name}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Date of Birth</p>
+                  <p className="text-lg font-semibold">{new Date(selectedApplication.date_of_birth).toLocaleDateString()}</p>
+                </div>
+
+                <div>
+                  <p className="text-sm text-gray-500">Email</p>
+                  <p className="text-lg font-semibold">{selectedApplication.email}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Phone</p>
+                  <p className="text-lg font-semibold">{selectedApplication.phone}</p>
+                </div>
+
+                <div>
+                  <p className="text-sm text-gray-500">District</p>
+                  <p className="text-lg font-semibold">{collectionPointName ?? getAppField(selectedApplication, 'district') ?? '-'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Address</p>
+                  <p className="text-lg font-semibold">{getAppField(selectedApplication, 'address') ?? '-'}</p>
+                </div>
+
+                <div>
+                  <p className="text-sm text-gray-500">Collection Point</p>
+                  <p className="text-lg font-semibold">{collectionPointName ?? '-'}</p>
+                </div>
+
+                <div className="col-span-2">
+                  <p className="text-sm text-gray-500">Notes</p>
+                  <p className="text-lg font-semibold">{getAppField(selectedApplication, 'notes') ?? '-'}</p>
+                </div>
+
+                <div className="col-span-2">
+                  <p className="text-sm text-gray-500">Uploaded Documents</p>
+                  <div className="mt-2 space-y-1">
+                    {getAppDocuments(selectedApplication).length === 0 ? (
+                      <p className="text-sm text-gray-400">No documents uploaded</p>
+                    ) : (
+                      getAppDocuments(selectedApplication).map((d, i) => (
+                        <div key={i}>
+                          <a
+                            href={d.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline text-sm"
+                          >
+                            {d.name ?? d.url}
+                          </a>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* Emergency Contact */}
-              <div>
-                <h4 className="text-lg font-semibold text-gray-900 mb-3">Emergency Contact</h4>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div><span className="font-medium">Name:</span> {selectedApplication.emergency_contact_name}</div>
-                  <div><span className="font-medium">Phone:</span> {selectedApplication.emergency_contact_phone}</div>
-                </div>
-              </div>
-
-              {/* Documents */}
-              <div>
-                <h4 className="text-lg font-semibold text-gray-900 mb-3">Uploaded Documents</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {selectedApplication.id_document_url && (
-                    <div className="border border-gray-200 rounded-lg p-3">
-                      <p className="font-medium text-sm text-gray-900 mb-2">National ID / Birth Certificate</p>
-                      <div className="bg-blue-50 p-2 rounded text-center">
-                        <FileText className="w-8 h-8 text-blue-600 mx-auto mb-1" />
-                        <p className="text-xs text-blue-600">Document Uploaded</p>
-                      </div>
-                    </div>
-                  )}
-                  {selectedApplication.proof_of_address_url && (
-                    <div className="border border-gray-200 rounded-lg p-3">
-                      <p className="font-medium text-sm text-gray-900 mb-2">Village Chief Letter</p>
-                      <div className="bg-green-50 p-2 rounded text-center">
-                        <FileText className="w-8 h-8 text-green-600 mx-auto mb-1" />
-                        <p className="text-xs text-green-600">Document Uploaded</p>
-                      </div>
-                    </div>
-                  )}
-                  {selectedApplication.proof_of_payment_url && (
-                    <div className="border border-gray-200 rounded-lg p-3">
-                      <p className="font-medium text-sm text-gray-900 mb-2">Proof of Payment</p>
-                      <div className="bg-purple-50 p-2 rounded text-center">
-                        <FileText className="w-8 h-8 text-purple-600 mx-auto mb-1" />
-                        <p className="text-xs text-purple-600">Payment Verified</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Status Actions */}
-              <div className="border-t pt-4">
-                <h4 className="text-lg font-semibold text-gray-900 mb-3">Update Status</h4>
-                <div className="flex space-x-3">
-                  {selectedApplication.status === 'submitted' && (
-                    <button
-                      onClick={() => {
-                        updateStatus(selectedApplication.id, 'under_review');
-                        setShowApplicationModal(false);
-                      }}
-                      className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
-                    >
-                      Start Review
-                    </button>
-                  )}
-                  {selectedApplication.status === 'under_review' && (
-                    <>
-                      <button
-                        onClick={() => {
-                          updateStatus(selectedApplication.id, 'approved');
-                          setShowApplicationModal(false);
-                        }}
-                        className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
-                      >
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowApplicationModal(false);
-                          updateStatus(selectedApplication.id, 'rejected');
-                        }}
-                        className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
-                      >
-                        Reject
-                      </button>
-                    </>
-                  )}
-                </div>
+              <div className="mt-4">
+                <button
+                  onClick={() => updateStatus(selectedApplication.id, 'approved')}
+                  className="w-full bg-green-600 text-white px-4 py-2 rounded-lg shadow hover:bg-green-700 transition-all"
+                >
+                  Approve Application
+                </button>
+                <button
+                  onClick={() => updateStatus(selectedApplication.id, 'rejected')}
+                  className="w-full bg-red-600 text-white px-4 py-2 rounded-lg shadow hover:bg-red-700 transition-all mt-2"
+                >
+                  Reject Application
+                </button>
+                <button
+                  onClick={() => setShowApplicationModal(false)}
+                  className="w-full bg-gray-300 text-gray-700 px-4 py-2 rounded-lg shadow hover:bg-gray-400 transition-all mt-2"
+                >
+                  Close
+                </button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Rejection Modal */}
+      {/* Official Form Modal */}
+      {showOfficialModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">{editingOfficial ? 'Edit Official' : 'Add Official'}</h3>
+                <button
+                  onClick={() => setShowOfficialModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="employee_id">
+                  Employee ID
+                </label>
+                <input
+                  type="text"
+                  id="employee_id"
+                  value={officialFormData.employee_id}
+                  onChange={(e) => setOfficialFormData({ ...officialFormData, employee_id: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={!!editingOfficial}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="first_name">
+                    First Name
+                  </label>
+                  <input
+                    type="text"
+                    id="first_name"
+                    value={officialFormData.first_name}
+                    onChange={(e) => setOfficialFormData({ ...officialFormData, first_name: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="last_name">
+                    Last Name
+                  </label>
+                  <input
+                    type="text"
+                    id="last_name"
+                    value={officialFormData.last_name}
+                    onChange={(e) => setOfficialFormData({ ...officialFormData, last_name: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="email">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  id="email"
+                  value={officialFormData.email}
+                  onChange={(e) => setOfficialFormData({ ...officialFormData, email: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="phone">
+                  Phone
+                </label>
+                <input
+                  type="text"
+                  id="phone"
+                  value={officialFormData.phone}
+                  onChange={(e) => setOfficialFormData({ ...officialFormData, phone: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="district">
+                  District
+                </label>
+                <select
+                  id="district"
+                  value={officialFormData.district}
+                  onChange={(e) => setOfficialFormData({ ...officialFormData, district: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                >
+                  <option value="">Select a district</option>
+                  {districts.map((district) => (
+                    <option key={district} value={district}>{district}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="position">
+                  Position
+                </label>
+                <input
+                  type="text"
+                  id="position"
+                  value={officialFormData.position}
+                  onChange={(e) => setOfficialFormData({ ...officialFormData, position: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="password">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  id="password"
+                  value={officialFormData.password}
+                  onChange={(e) => setOfficialFormData({ ...officialFormData, password: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required={!editingOfficial}
+                />
+              </div>
+
+              <div className="flex justify-end gap-4">
+                <button
+                  onClick={() => setShowOfficialModal(false)}
+                  className="w-full bg-gray-300 text-gray-700 px-4 py-2 rounded-lg shadow hover:bg-gray-400 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={editingOfficial ? handleUpdateOfficial : handleCreateOfficial}
+                  className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700 transition-all"
+                >
+                  {editingOfficial ? 'Update Official' : 'Create Official'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rejection Reason Modal */}
       {showRejectionModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Reject Application</h3>
-            <p className="text-gray-600 mb-4">Please provide a reason for rejecting this application:</p>
-            <textarea
-              id="rejection_reason"
-              name="rejection_reason"
-              value={rejectionReason}
-              onChange={(e) => setRejectionReason(e.target.value)}
-              rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-              placeholder="Enter rejection reason..."
-            />
-            <div className="flex justify-end space-x-3 mt-6">
-              <button
-                onClick={() => {
-                  setShowRejectionModal(false);
-                  setRejectionReason('');
-                  setApplicationToReject(null);
-                }}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleRejection}
-                className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors"
-              >
-                Reject Application
-              </button>
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">Rejection Reason</h3>
+                <button
+                  onClick={() => setShowRejectionModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="rejection_reason">
+                  Reason for Rejection
+                </label>
+                <textarea
+                  id="rejection_reason"
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  rows={3}
+                  required
+                />
+              </div>
+
+              <div className="flex justify-end gap-4">
+                <button
+                  onClick={() => setShowRejectionModal(false)}
+                  className="w-full bg-gray-300 text-gray-700 px-4 py-2 rounded-lg shadow hover:bg-gray-400 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleRejection}
+                  className="w-full bg-red-600 text-white px-4 py-2 rounded-lg shadow hover:bg-red-700 transition-all"
+                >
+                  Reject Application
+                </button>
+              </div>
             </div>
           </div>
         </div>

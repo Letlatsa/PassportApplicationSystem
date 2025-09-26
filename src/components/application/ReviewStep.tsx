@@ -10,6 +10,8 @@ interface ReviewStepProps {
   onPrev: () => void;
   onSubmit: () => void;
   isSubmitting: boolean;
+  isFirst?: boolean;
+  isLast?: boolean;
 }
 
 export default function ReviewStep({ formData, onPrev, onSubmit, isSubmitting }: ReviewStepProps) {

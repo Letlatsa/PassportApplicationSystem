@@ -8,6 +8,7 @@ interface PersonalInfoStepProps {
   updateFormData: (data: ApplicationFormData) => void;
   onNext: () => void;
   isFirst: boolean;
+  isLast?: boolean;
 }
 
 export default function PersonalInfoStep({ formData, updateFormData, onNext, isFirst }: PersonalInfoStepProps) {

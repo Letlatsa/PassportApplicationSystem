@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 import type { Database } from '../lib/supabase';
+import { PostgrestError } from '@supabase/supabase-js';
 
 type Application = Database['public']['Tables']['passport_applications']['Row'];
 type ApplicationInsert = Database['public']['Tables']['passport_applications']['Insert'];
@@ -10,8 +11,8 @@ interface ApplicationContextType {
   applications: Application[];
   loading: boolean;
   refreshApplications: () => Promise<void>;
-  createApplication: (data: ApplicationInsert) => Promise<{ data: Application | null; error: Error | null }>;
-  updateApplicationStatus: (id: string, status: string, notes?: string) => Promise<{ error: Error | null }>;
+  createApplication: (data: ApplicationInsert) => Promise<{ data: Application | null; error: PostgrestError | Error | null }>;
+  updateApplicationStatus: (id: string, status: string, notes?: string) => Promise<{ error: PostgrestError | null }>;
 }
 
 const ApplicationContext = createContext<ApplicationContextType | undefined>(undefined);
