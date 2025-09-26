@@ -13,6 +13,12 @@ type Application = Database['public']['Tables']['passport_applications']['Row'];
 export default function Dashboard() {
   const { user } = useAuth();
   const { applications, loading, refreshApplications } = useApplications();
+  const adminEmails = ['admin@lesotho.gov', 'admin@gov.ls'];
+  const isAdminUser = Boolean(
+    user &&
+    user.email &&
+    (adminEmails.includes(user.email) || user.email.includes('admin'))
+  );
   const [searchTerm, setSearchTerm] = useState('');
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
@@ -151,6 +157,26 @@ export default function Dashboard() {
           <p className="text-gray-600">
             Manage your passport applications and track their progress
           </p>
+        </div>
+
+        {/* Top nav: Admin (only visible to admins) then Dashboard */}
+        <div className="mb-4">
+          <nav className="flex items-center space-x-3">
+            {isAdminUser && (
+              <Link
+                to="/admin"
+                className="px-3 py-2 rounded-md text-sm font-medium bg-gray-100 hover:bg-gray-200"
+              >
+                Admin
+              </Link>
+            )}
+            <Link
+              to="/dashboard"
+              className="px-3 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700"
+            >
+              Dashboard
+            </Link>
+          </nav>
         </div>
       </div>
 

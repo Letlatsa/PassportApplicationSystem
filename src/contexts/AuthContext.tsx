@@ -1,15 +1,29 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User } from '@supabase/supabase-js';
+import { User, AuthError } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+
+export interface UserProfile {
+  first_name: string;
+  last_name: string;
+  phone: string;
+  role: string;
+  [key: string]: unknown;
+}
+
+export interface SignUpData {
+  first_name: string;
+  last_name: string;
+  phone: string;
+}
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string, userData: any) => Promise<{ error: any }>;
+  signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
+  signUp: (email: string, password: string, userData: SignUpData) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
   isAdmin: boolean;
-  userProfile: any;
+  userProfile: UserProfile | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -26,7 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [userProfile, setUserProfile] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
     // Get initial session
@@ -45,7 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (_event, session) => {
         setUser(session?.user || null);
         
         if (session?.user) {
@@ -75,14 +89,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const adminEmails = ['admin@lesotho.gov', 'admin@gov.ls'];
       const isAdminUser = adminEmails.includes(user?.email || '') || 
                          profile?.role === 'admin' || 
-                         user?.email?.includes('admin');
+                         !!user?.email?.includes('admin');
       setIsAdmin(isAdminUser);
     } catch (error) {
       console.error('Error fetching user profile:', error);
       // Fallback admin check if profile fetch fails
       const adminEmails = ['admin@lesotho.gov', 'admin@gov.ls'];
       const isAdminUser = adminEmails.includes(user?.email || '') || 
-                         user?.email?.includes('admin');
+                         !!user?.email?.includes('admin');
       setIsAdmin(isAdminUser);
     }
   };
@@ -91,7 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error };
   };
 
-  const signUp = async (email: string, password: string, userData: any) => {
+  const signUp = async (email: string, password: string, userData: SignUpData) => {
     const { error } = await supabase.auth.signUp({
       email,
       password,

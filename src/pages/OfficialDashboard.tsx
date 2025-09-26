@@ -72,7 +72,9 @@ export default function OfficialDashboard() {
       .eq('role', 'staff')
       .single();
 
-    if (data) {
+    if (error) {
+      console.error("Error fetching official data:", error);
+    } else if (data) {
       // Map profile to official format
       setOfficial({
         id: data.id,
@@ -235,6 +237,7 @@ export default function OfficialDashboard() {
         setFingerprintData('');
       }
     } catch (error) {
+      console.error("Error capturing biometrics:", error);
       const errorDiv = document.createElement('div');
       errorDiv.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50';
       errorDiv.textContent = 'Error capturing biometrics';
