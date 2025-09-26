@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FileText, Clock, CheckCircle, Package, Plus, Search, Calendar, AlertCircle } from 'lucide-react';
+import { FileText, Clock, CheckCircle, Package, Plus, Search, Calendar, AlertCircle, MessageCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useApplications } from '../contexts/ApplicationContext';
+import { supabase } from '../lib/supabase';
 import ApplicationCard from '../components/dashboard/ApplicationCard';
 import StatusTimeline from '../components/dashboard/StatusTimeline';
 import type { Database } from '../lib/supabase';
@@ -20,15 +21,23 @@ export default function Dashboard() {
     time: '',
     reference_number: ''
   });
+  const [isBooking, setIsBooking] = useState(false);
+
+  // Added state for rejection modal
+  const [showRejectionModal, setShowRejectionModal] = useState(false);
+  // no separate rejectionMessage state — compute from selectedApplication when needed
 
   useEffect(() => {
+    if (!user) return;
+    // only refresh when user changes / on mount; avoid continuous calls if refreshApplications is unstable
     refreshApplications();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
-  const hasActiveApplication = applications.some(app => 
+  const hasActiveApplication = applications.some(app =>
     ['submitted', 'under_review', 'approved'].includes(app.status)
   );
-  
+
   // Add error handling for missing data
   const safeApplications = applications || [];
   const safeStats = {
@@ -50,16 +59,59 @@ export default function Dashboard() {
       return;
     }
 
+    // Prevent multiple future appointments per user
     try {
-      // In a real app, you would save this to a biometrics_appointments table
-      alert(`Appointment booked successfully for ${appointmentData.date} at ${appointmentData.time}. You will receive a confirmation email shortly.`);
-      setShowAppointmentModal(false);
-      setAppointmentData({ date: '', time: '', reference_number: '' });
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      const { data: existingAppointments, error: fetchError } = await supabase
+        .from('biometrics_appointments')
+        .select('id,date')
+        .eq('user_id', user?.id)
+        .gte('date', today); // any appointment on or after today
+
+      if (!fetchError && Array.isArray(existingAppointments) && existingAppointments.length > 0) {
+        alert('You already have a biometrics appointment scheduled. You may book a new appointment only after your current appointment date has passed.');
+        return;
+      }
+    } catch (err) {
+      // ignore — we'll show a friendly message below if booking fails
+      console.warn('Could not check existing appointments:', err);
+    }
+
+    try {
+      setIsBooking(true);
+      const { error: insertError } = await supabase
+        .from('biometrics_appointments')
+        .insert([{
+          application_id: selectedApplication.id,
+          user_id: selectedApplication.user_id,
+          reference_number: appointmentData.reference_number,
+          date: appointmentData.date,
+          time: appointmentData.time,
+          created_at: new Date().toISOString()
+        }]);
+
+      if (insertError) {
+        // existing error handling...
+        console.error('Booking error:', insertError);
+        if (insertError.code === 'PGRST205' || (insertError.message && String(insertError.message).includes('Could not find the table'))) {
+          alert('Booking currently unavailable: appointments table not found on server. Please contact support.');
+        } else {
+          alert('Could not save appointment to server. If the problem persists contact support.');
+        }
+      } else {
+        alert(`Appointment booked successfully for ${appointmentData.date} at ${appointmentData.time}. You will receive a confirmation email shortly.`);
+        setShowAppointmentModal(false);
+        setAppointmentData({ date: '', time: '', reference_number: '' });
+        refreshApplications();
+      }
     } catch (error) {
       console.error('Error booking appointment:', error);
       alert('Error booking appointment. Please try again.');
+    } finally {
+      setIsBooking(false);
     }
   };
+
   const filteredApplications = applications.filter(app =>
     app.reference_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
     app.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -67,6 +119,19 @@ export default function Dashboard() {
   );
 
   const stats = safeStats;
+
+  // compute selected application's rejection reason (if any)
+  const selectedRejectionReason: string | null = selectedApplication
+    ? (() => {
+        const record = selectedApplication as unknown as Record<string, unknown>;
+        const candidates = ['rejection_reason', 'notes', 'reason', 'rejectionReason', 'admin_notes'];
+        for (const key of candidates) {
+          const val = record[key];
+          if (typeof val === 'string' && val.trim().length > 0) return val;
+        }
+        return null;
+      })()
+    : null;
 
   if (loading) {
     return (
@@ -79,14 +144,14 @@ export default function Dashboard() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-screen">
       <div className="bg-white/90 backdrop-blur-sm rounded-lg p-6 mb-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Welcome back, {user?.user_metadata?.first_name || user?.email}
-        </h1>
-        <p className="text-gray-600">
-          Manage your passport applications and track their progress
-        </p>
-      </div>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Welcome back, {user?.user_metadata?.first_name || user?.email}
+          </h1>
+          <p className="text-gray-600">
+            Manage your passport applications and track their progress
+          </p>
+        </div>
       </div>
 
       {/* Statistics Cards */}
@@ -160,7 +225,7 @@ export default function Dashboard() {
                 </span>
               </div>
             )}
-            
+
             {applications.some(app => app.status === 'approved') && (
               <button
                 onClick={() => {
@@ -194,14 +259,14 @@ export default function Dashboard() {
       {/* Applications List */}
       <div className="space-y-6">
         <h2 className="text-2xl font-bold text-gray-900">Your Applications</h2>
-        
+
         {filteredApplications.length === 0 ? (
           <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow p-12 text-center">
             <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-gray-900 mb-2">No Applications Found</h3>
             <p className="text-gray-600 mb-6">
-              {applications.length === 0 
-                ? "You haven't submitted any passport applications yet." 
+              {applications.length === 0
+                ? "You haven't submitted any passport applications yet."
                 : "No applications match your search criteria."
               }
             </p>
@@ -220,8 +285,27 @@ export default function Dashboard() {
             {filteredApplications.map((application) => (
               <div key={application.id} className="bg-white/90 backdrop-blur-sm rounded-lg shadow overflow-hidden">
                 <ApplicationCard application={application} />
-                <div className="border-t border-gray-200">
+                <div className="border-t border-gray-200 p-4 flex items-center justify-between">
                   <StatusTimeline applicationId={application.id} currentStatus={application.status} />
+                  {/* when approved show a message icon that opens informational modal + option to book */}
+                  {application.status === 'approved' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedApplication(application);
+                        // prefill reference number
+                        setAppointmentData(prev => ({ ...prev, reference_number: application.reference_number }));
+                        // show info modal first (we reuse showAppointmentModal to book)
+                        // open a small info prompt: set showAppointmentModal to true so user can pick date/time
+                        setShowAppointmentModal(true);
+                      }}
+                      className="ml-2 p-2 rounded-full text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      aria-label="Appointment info"
+                      title="Make biometrics appointment"
+                    >
+                      <MessageCircle className="w-5 h-5" />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -230,11 +314,11 @@ export default function Dashboard() {
       </div>
 
       {/* Appointment Booking Modal */}
-      {showAppointmentModal && (
+      {showAppointmentModal && selectedApplication && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Book Biometrics Appointment</h3>
-            
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -248,7 +332,7 @@ export default function Dashboard() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Preferred Date
@@ -261,7 +345,7 @@ export default function Dashboard() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Preferred Time
@@ -281,7 +365,7 @@ export default function Dashboard() {
                 </select>
               </div>
             </div>
-            
+
             <div className="flex justify-end space-x-3 mt-6">
               <button
                 onClick={() => setShowAppointmentModal(false)}
@@ -292,8 +376,59 @@ export default function Dashboard() {
               <button
                 onClick={bookAppointment}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors"
+                disabled={isBooking}
               >
                 Book Appointment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rejection modal */}
+      {showRejectionModal && selectedApplication && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="rejection-modal-title"
+        >
+          <div
+            className="fixed inset-0 bg-black/40 -z-10"
+            onClick={() => setShowRejectionModal(false)}
+            aria-hidden="true"
+          />
+          <div className="relative max-w-lg w-full bg-white rounded-lg shadow-lg p-6 z-10">
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 id="rejection-modal-title" className="text-lg font-medium">Application Rejection Reason</h3>
+                <p className="text-sm text-gray-500">
+                  Reference: <span className="font-medium text-gray-700">{selectedApplication.reference_number}</span>
+                  {selectedApplication.first_name || selectedApplication.last_name ? (
+                    <> — {selectedApplication.first_name} {selectedApplication.last_name}</>
+                  ) : null}
+                </p>
+              </div>
+
+              <button
+                onClick={() => setShowRejectionModal(false)}
+                className="text-gray-400 hover:text-gray-600 ml-4"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="mt-4 text-sm text-gray-700">
+              <pre className="whitespace-pre-wrap bg-gray-50 p-3 rounded">{selectedRejectionReason ?? 'No reason provided.'}</pre>
+            </div>
+
+            <div className="mt-6 text-right">
+              <button
+                onClick={() => setShowRejectionModal(false)}
+                className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+              >
+                Close
               </button>
             </div>
           </div>

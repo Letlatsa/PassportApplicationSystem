@@ -7,6 +7,8 @@ interface DocumentsStepProps {
   updateFormData: (data: ApplicationFormData) => void;
   onNext: () => void;
   onPrev: () => void;
+  isFirst?: boolean;
+  isLast?: boolean;
 }
 
 export default function DocumentsStep({ formData, updateFormData, onNext, onPrev }: DocumentsStepProps) {

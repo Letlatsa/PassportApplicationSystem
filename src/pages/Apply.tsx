@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, ChevronLeft } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import PersonalInfoStep from '../components/application/PersonalInfoStep';
 import DocumentsStep from '../components/application/DocumentsStep';
 import CollectionPointStep from '../components/application/CollectionPointStep';
@@ -104,7 +104,8 @@ export default function Apply() {
         proof_of_payment_url: formData.proofOfPayment ? 'uploaded' : null,
         collection_point_id: formData.collectionPointId,
         status: 'submitted' as const,
-        qr_code: null
+        qr_code: null,
+        passport_photo_url: null
       };
 
       console.log('Submitting application data:', applicationData);
@@ -114,7 +115,7 @@ export default function Apply() {
       if (error) {
         console.error('Supabase error:', error);
         // Provide more specific error messages
-        if (error.code === 'PGRST204') {
+        if ('code' in error && error.code === 'PGRST204') {
           throw new Error('Database schema error. Please contact support.');
         }
         throw error;

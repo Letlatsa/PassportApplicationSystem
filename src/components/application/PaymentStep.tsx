@@ -7,6 +7,8 @@ interface PaymentStepProps {
   updateFormData: (data: ApplicationFormData) => void;
   onNext: () => void;
   onPrev: () => void;
+  isFirst?: boolean;
+  isLast?: boolean;
 }
 
 export default function PaymentStep({ formData, updateFormData, onNext, onPrev }: PaymentStepProps) {
