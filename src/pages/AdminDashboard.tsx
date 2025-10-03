@@ -3,6 +3,7 @@ import { FileText, Users, MapPin, TrendingUp, Search, Filter, Plus, X, Calendar 
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { Database } from '../lib/supabase';
+import { sendNotificationEmail } from '../lib/notifications';
 
 type Application = Database['public']['Tables']['passport_applications']['Row'];
 
@@ -333,6 +334,10 @@ export default function AdminDashboard() {
     setShowOfficialModal(true);
   };
 
+
+
+
+
   const updateStatus = async (id: string, newStatus: string) => {
     if (newStatus === 'rejected') {
       setApplicationToReject(id);
@@ -387,11 +392,9 @@ export default function AdminDashboard() {
       document.body.appendChild(errorDiv);
       setTimeout(() => errorDiv.remove(), 5000);
     } else {
-      if (newStatus === 'approved') {
-        const application = applications.find(app => app.id === id);
-        if (application) {
-          await sendApprovalEmail(application);
-        }
+      const application = applications.find(app => app.id === id);
+      if (application) {
+        await sendNotificationEmail(application, newStatus);
       }
       fetchApplications();
     }
@@ -458,6 +461,12 @@ export default function AdminDashboard() {
       successDiv.textContent = 'Application rejected successfully';
       document.body.appendChild(successDiv);
       setTimeout(() => successDiv.remove(), 3000);
+
+      const application = applications.find(app => app.id === applicationToReject);
+      if (application) {
+        await sendNotificationEmail(application, 'rejected');
+      }
+
       fetchApplications();
       setShowRejectionModal(false);
       setRejectionReason('');
@@ -474,25 +483,6 @@ export default function AdminDashboard() {
     
     if (data) {
       setCollectionPointName(data.name);
-    }
-  };
-
-  const sendApprovalEmail = async (application: Application) => {
-    try {
-      await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-approval-email`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: application.email,
-          name: `${application.first_name} ${application.last_name}`,
-          reference_number: application.reference_number
-        })
-      });
-    } catch (error) {
-      console.error('Error sending approval email:', error);
     }
   };
 
@@ -1344,5 +1334,4 @@ export default function AdminDashboard() {
         </div>
       )}
     </div>
-  );
-}
+    );}
