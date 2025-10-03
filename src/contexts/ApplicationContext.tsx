@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 import type { Database } from '../lib/supabase';
 import { PostgrestError } from '@supabase/supabase-js';
+import { sendNotificationEmail } from '../lib/notifications';
 
 type Application = Database['public']['Tables']['passport_applications']['Row'];
 type ApplicationInsert = Database['public']['Tables']['passport_applications']['Insert'];
@@ -78,6 +79,7 @@ export function ApplicationProvider({ children }: { children: React.ReactNode })
     }
 
     if (!error && data) {
+      await sendNotificationEmail(data, 'submitted');
       await refreshApplications();
     }
 
