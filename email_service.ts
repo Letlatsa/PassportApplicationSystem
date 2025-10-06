@@ -25,13 +25,11 @@ serve(async (req: Request) => {
       );
     }
 
-    console.log('=== EMAIL SERVICE STARTED (SendGrid) ===');
-
     if (!SENDGRID_API_KEY) {
       throw new Error('SendGrid API key is not configured');
     }
 
-    const { recipient_email, status, name, reference_number } = await req.json();
+    const { recipient_email, status, name, reference_number, appointment_date, appointment_time } = await req.json();
     console.log('Sending email to:', recipient_email);
 
     if (!recipient_email || !status || !name || !reference_number) {
@@ -41,13 +39,19 @@ serve(async (req: Request) => {
     const statusMessages: Record<string, string> = {
       submitted: `Dear ${name},<br><br>Your passport application (Ref: ${reference_number}) has been successfully submitted. You will be notified once it is reviewed and approved.`,
       under_review: `Dear ${name},<br><br>Your passport application (Ref: ${reference_number}) is currently under review by our team.`,
-      approved: `Dear ${name},<br><br>Great news! Your passport application (Ref: ${reference_number}) has been approved.`,
+      approved: `Dear ${name},<br><br>Great news! Your passport application (Ref: ${reference_number}) has been approved. Please schedule an appointment to visit our offices for biometrics.`,
+      appointment_booked: `Dear ${name},<br><br>Your biometrics appointment has been successfully booked!<br><br><strong>Appointment Details:</strong><br>Date: ${appointment_date || 'N/A'}<br>Time: ${appointment_time || 'N/A'}<br>Reference: ${reference_number}<br><br>Please arrive 10 minutes early and bring a valid ID document.`,
       ready_for_collection: `Dear ${name},<br><br>Your passport (Ref: ${reference_number}) is ready for collection. Please visit your selected collection point with a valid ID.`,
       collected: `Dear ${name},<br><br>Your passport (Ref: ${reference_number}) has been successfully collected. Thank you for using our service.`,
-      rejected: `Dear ${name},<br><br>Unfortunately, your passport application (Ref: ${reference_number}) has been rejected. Please contact our office for more details.`,
+      rejected: `Dear ${name},<br><br>Unfortunately, your passport application (Ref: ${reference_number}) has been rejected. Log in and reapply or contact our office for more details.`,
     };
 
     const message = statusMessages[status] || `Dear ${name},<br><br>Your application status for Ref: ${reference_number} has been updated.`;
+    
+    // Dynamic subject line based on status
+    const emailSubject = status === 'appointment_booked' 
+      ? `Biometrics Appointment Confirmed - Ref: ${reference_number}`
+      : `Passport Application Update - Ref: ${reference_number}`;
 
     console.log('Calling SendGrid API...');
 
@@ -61,10 +65,10 @@ serve(async (req: Request) => {
       body: JSON.stringify({
         personalizations: [{
           to: [{ email: recipient_email, name: name }],
-          subject: `Passport Application Status Update - Ref: ${reference_number}`
+          subject: emailSubject
         }],
         from: {
-          email: 'kadijodeliveries@gmail.com', // USE YOUR VERIFIED EMAIL HERE
+          email: 'kadijodeliveries@gmail.com', 
           name: 'Passport Office'
         },
         content: [{
