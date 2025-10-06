@@ -11,6 +11,7 @@ import Dashboard from './pages/Dashboard';
 import CollectionPoints from './pages/CollectionPoints';
 import AdminDashboard from './pages/AdminDashboard';
 import OfficialDashboard from './pages/OfficialDashboard';
+import OfficerRegister from './pages/OfficerRegister';
 import CollectionInterface from './pages/CollectionInterface';
 import Profile from './pages/Profile';
 
@@ -71,6 +72,7 @@ function App() {
                 <Route path="/collection-points" element={<ProtectedRoute><CollectionPoints /></ProtectedRoute>} />
                 <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
                 <Route path="/official" element={<ProtectedRoute><OfficialDashboard /></ProtectedRoute>} />
+                <Route path="/officerRegister" element={<ProtectedRoute><OfficerRegister /></ProtectedRoute>} />
                 <Route path="/collection-interface" element={<CollectionInterface />} />
               </Routes>
             </main>
