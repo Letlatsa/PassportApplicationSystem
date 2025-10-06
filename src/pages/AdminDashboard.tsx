@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { Database } from '../lib/supabase';
 import { sendNotificationEmail } from '../lib/notifications';
+import { useNavigate } from 'react-router-dom'; // Add this import
 
 type Application = Database['public']['Tables']['passport_applications']['Row'];
 
@@ -34,6 +35,7 @@ type RawProfile = {
 
 export default function AdminDashboard() {
   const { isAdmin, user } = useAuth();
+  const navigate = useNavigate(); // Add this hook
   const [applications, setApplications] = useState<Application[]>([]);
   const [appointments, setAppointments] = useState<Array<{
     id: string;
@@ -57,18 +59,9 @@ export default function AdminDashboard() {
   const [applicationToReject, setApplicationToReject] = useState<string | null>(null);
   const [collectionPointName, setCollectionPointName] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'applications' | 'officials' | 'appointments'>('applications');
-  const [showOfficialModal, setShowOfficialModal] = useState(false);
-  const [editingOfficial, setEditingOfficial] = useState<Official | null>(null);
-  const [officialFormData, setOfficialFormData] = useState({
-    employee_id: '',
-    first_name: '',
-    last_name: '',
-    email: '',
-    phone: '',
-    district: '',
-    position: 'Passport Officer',
-    password: ''
-  });
+  
+  // Remove official modal and form state since we're redirecting
+  //const [editingOfficial, setEditingOfficial] = useState<Official | null>(null);
 
   useEffect(() => {
     // Check admin status more thoroughly
@@ -172,115 +165,9 @@ export default function AdminDashboard() {
     setOfficials(mappedOfficials);
   };
 
-  const districts = [
-    'Butha-Buthe', 'Leribe', 'Berea', 'Maseru', 'Mafeteng', 
-    'Mohale\'s Hoek', 'Qacha\'s Nek', 'Quthing', 'Mokhotlong', 'Thaba-Tseka'
-  ];
+  // Remove handleCreateOfficial function
 
-  const handleCreateOfficial = async () => {
-    if (!officialFormData.employee_id || !officialFormData.first_name || !officialFormData.last_name || 
-        !officialFormData.email || !officialFormData.phone || !officialFormData.district || !officialFormData.password) {
-      console.error('Please fill in all required fields');
-      // Use a more user-friendly notification instead of alert
-      const errorDiv = document.createElement('div');
-      errorDiv.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50';
-      errorDiv.textContent = 'Please fill in all required fields';
-      document.body.appendChild(errorDiv);
-      setTimeout(() => errorDiv.remove(), 3000);
-      return;
-    }
-
-    try {
-      // Create user account first
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: officialFormData.email,
-        password: officialFormData.password,
-        options: {
-          data: {
-            first_name: officialFormData.first_name,
-            last_name: officialFormData.last_name,
-            role: 'staff'
-          }
-        }
-      });
-
-      if (authError) throw authError;
-
-      // Create profile record
-      const { error: officialError } = await supabase
-        .from('profiles')
-        .insert([{ 
-          user_id: authData.user?.id || crypto.randomUUID(),
-          first_name: officialFormData.first_name,
-          last_name: officialFormData.last_name,
-          national_id: officialFormData.employee_id,
-          phone_number: officialFormData.phone,
-          date_of_birth: '1990-01-01', // Mock date
-          address: officialFormData.district,
-          district: officialFormData.district,
-          role: 'staff'
-        }]);
-
-      if (officialError) throw officialError;
-
-      // Success notification
-      const successDiv = document.createElement('div');
-      successDiv.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50';
-      successDiv.textContent = 'Official account created successfully!';
-      document.body.appendChild(successDiv);
-      setTimeout(() => successDiv.remove(), 3000);
-      
-      setShowOfficialModal(false);
-      resetOfficialForm();
-      fetchOfficials();
-    } catch (error: unknown) {
-      console.error('Error creating official:', error);
-      const errorDiv = document.createElement('div');
-      errorDiv.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50';
-      if (error instanceof Error) {
-        errorDiv.textContent = `Error creating official: ${error.message}`;
-      } else {
-        errorDiv.textContent = 'An unknown error occurred while creating the official.';
-      }
-      document.body.appendChild(errorDiv);
-      setTimeout(() => errorDiv.remove(), 5000);
-    }
-  };
-
-  const handleUpdateOfficial = async () => {
-    if (!editingOfficial) return;
-
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        national_id: officialFormData.employee_id,
-        first_name: officialFormData.first_name,
-        last_name: officialFormData.last_name,
-        phone_number: officialFormData.phone,
-        district: officialFormData.district,
-        address: officialFormData.district
-      })
-      .eq('id', editingOfficial.id);
-
-    if (!error) {
-      const successDiv = document.createElement('div');
-      successDiv.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50';
-      successDiv.textContent = 'Official updated successfully!';
-      document.body.appendChild(successDiv);
-      setTimeout(() => successDiv.remove(), 3000);
-      
-      setShowOfficialModal(false);
-      setEditingOfficial(null);
-      resetOfficialForm();
-      fetchOfficials();
-    } else {
-      const errorDiv = document.createElement('div');
-      errorDiv.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50';
-      errorDiv.textContent = 'Error updating official';
-      document.body.appendChild(errorDiv);
-      setTimeout(() => errorDiv.remove(), 3000);
-    }
-  };
+  // Remove handleUpdateOfficial function
 
   const handleDeleteOfficial = async (officialId: string) => {
     if (!window.confirm('Are you sure you want to delete this official?')) return;
@@ -306,37 +193,14 @@ export default function AdminDashboard() {
     }
   };
 
-  const resetOfficialForm = () => {
-    setOfficialFormData({
-      employee_id: '',
-      first_name: '',
-      last_name: '',
-      email: '',
-      phone: '',
-      district: '',
-      position: 'Passport Officer',
-      password: ''
-    });
+  // Remove resetOfficialForm function
+
+  // Remove openEditModal function
+
+  // Add this function to handle navigation to OfficerRegister
+  const handleAddOfficial = () => {
+    navigate('/officerRegister');
   };
-
-  const openEditModal = (official: Official) => {
-    setEditingOfficial(official);
-    setOfficialFormData({
-      employee_id: official.employee_id,
-      first_name: official.first_name,
-      last_name: official.last_name,
-      email: official.email,
-      phone: official.phone,
-      district: official.district,
-      position: official.position,
-      password: ''
-    });
-    setShowOfficialModal(true);
-  };
-
-
-
-
 
   const updateStatus = async (id: string, newStatus: string) => {
     if (newStatus === 'rejected') {
@@ -921,7 +785,7 @@ export default function AdminDashboard() {
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold">Officials Management</h2>
               <button
-                onClick={() => setShowOfficialModal(true)}
+                onClick={handleAddOfficial} // Updated to use navigation function
                 className="bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700 transition-all"
               >
                 <Plus className="w-4 h-4 inline-block mr-2" /> Add Official
@@ -991,12 +855,7 @@ export default function AdminDashboard() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex space-x-2">
-                          <button
-                            onClick={() => openEditModal(official)}
-                            className="text-blue-600 hover:text-blue-800 text-xs font-medium"
-                          >
-                            Edit
-                          </button>
+                          {/* Remove Edit button since we're redirecting to separate page */}
                           <button
                             onClick={() => handleDeleteOfficial(official.id)}
                             className="text-red-600 hover:text-red-800 text-xs font-medium"
@@ -1135,156 +994,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Official Form Modal */}
-      {showOfficialModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen">
-            <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">{editingOfficial ? 'Edit Official' : 'Add Official'}</h3>
-                <button
-                  onClick={() => setShowOfficialModal(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="employee_id">
-                  Employee ID
-                </label>
-                <input
-                  type="text"
-                  id="employee_id"
-                  value={officialFormData.employee_id}
-                  onChange={(e) => setOfficialFormData({ ...officialFormData, employee_id: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  disabled={!!editingOfficial}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="first_name">
-                    First Name
-                  </label>
-                  <input
-                    type="text"
-                    id="first_name"
-                    value={officialFormData.first_name}
-                    onChange={(e) => setOfficialFormData({ ...officialFormData, first_name: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="last_name">
-                    Last Name
-                  </label>
-                  <input
-                    type="text"
-                    id="last_name"
-                    value={officialFormData.last_name}
-                    onChange={(e) => setOfficialFormData({ ...officialFormData, last_name: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="email">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  id="email"
-                  value={officialFormData.email}
-                  onChange={(e) => setOfficialFormData({ ...officialFormData, email: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                />
-              </div>
-
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="phone">
-                  Phone
-                </label>
-                <input
-                  type="text"
-                  id="phone"
-                  value={officialFormData.phone}
-                  onChange={(e) => setOfficialFormData({ ...officialFormData, phone: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                />
-              </div>
-
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="district">
-                  District
-                </label>
-                <select
-                  id="district"
-                  value={officialFormData.district}
-                  onChange={(e) => setOfficialFormData({ ...officialFormData, district: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                >
-                  <option value="">Select a district</option>
-                  {districts.map((district) => (
-                    <option key={district} value={district}>{district}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="position">
-                  Position
-                </label>
-                <input
-                  type="text"
-                  id="position"
-                  value={officialFormData.position}
-                  onChange={(e) => setOfficialFormData({ ...officialFormData, position: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  disabled
-                />
-              </div>
-
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="password">
-                  Password
-                </label>
-                <input
-                  type="password"
-                  id="password"
-                  value={officialFormData.password}
-                  onChange={(e) => setOfficialFormData({ ...officialFormData, password: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required={!editingOfficial}
-                />
-              </div>
-
-              <div className="flex justify-end gap-4">
-                <button
-                  onClick={() => setShowOfficialModal(false)}
-                  className="w-full bg-gray-300 text-gray-700 px-4 py-2 rounded-lg shadow hover:bg-gray-400 transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={editingOfficial ? handleUpdateOfficial : handleCreateOfficial}
-                  className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700 transition-all"
-                >
-                  {editingOfficial ? 'Update Official' : 'Create Official'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Remove Official Form Modal */}
 
       {/* Rejection Reason Modal */}
       {showRejectionModal && (
@@ -1334,4 +1044,5 @@ export default function AdminDashboard() {
         </div>
       )}
     </div>
-    );}
+  );
+}

@@ -7,7 +7,7 @@ import { useApplications } from '../../contexts/ApplicationContext';
 import { useState } from 'react';
 
 export default function Navbar() {
-  const { user, signOut, isAdmin } = useAuth();
+  const { user, signOut, isAdmin, isStaff } = useAuth();
   const { applications } = useApplications();
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -41,48 +41,66 @@ export default function Navbar() {
           <div className="hidden md:flex items-center space-x-8">
             {user ? (
               <>
-                <Link
-                  to="/dashboard"
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    isActive('/dashboard') 
-                      ? 'bg-blue-100 text-blue-700' 
-                      : 'text-gray-700 hover:text-blue-600'
-                  }`}
-                >
-                  Dashboard
-                </Link>
-                <Link
-                  to="/profile"
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    isActive('/profile') 
-                      ? 'bg-blue-100 text-blue-700' 
-                      : 'text-gray-700 hover:text-blue-600'
-                  }`}
-                >
-                  Profile
-                </Link>
-                {!hasActiveApplication && (
+                {!isStaff && (
                   <Link
-                    to="/apply"
+                    to="/dashboard"
                     className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      isActive('/apply') 
-                        ? 'bg-blue-100 text-blue-700' 
+                      isActive('/dashboard')
+                        ? 'bg-blue-100 text-blue-700'
                         : 'text-gray-700 hover:text-blue-600'
                     }`}
                   >
-                    Apply
+                    Dashboard
                   </Link>
                 )}
-                <Link
-                  to="/collection-points"
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    isActive('/collection-points') 
-                      ? 'bg-blue-100 text-blue-700' 
-                      : 'text-gray-700 hover:text-blue-600'
-                  }`}
-                >
-                  Collection Points
-                </Link>
+                {isStaff && (
+                  <Link
+                    to="/official"
+                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      isActive('/official')
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'text-gray-700 hover:text-blue-600'
+                    }`}
+                  >
+                    Official Dashboard
+                  </Link>
+                )}
+                {!isStaff && (
+                  <>
+                    <Link
+                      to="/profile"
+                      className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                        isActive('/profile')
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'text-gray-700 hover:text-blue-600'
+                      }`}
+                    >
+                      Profile
+                    </Link>
+                    {!hasActiveApplication && (
+                      <Link
+                        to="/apply"
+                        className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                          isActive('/apply')
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'text-gray-700 hover:text-blue-600'
+                        }`}
+                      >
+                        Apply
+                      </Link>
+                    )}
+                    <Link
+                      to="/collection-points"
+                      className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                        isActive('/collection-points')
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'text-gray-700 hover:text-blue-600'
+                      }`}
+                    >
+                      Collection Points
+                    </Link>
+                  </>
+                )}
                 {isAdmin && (
                   <Link
                     to="/admin"
@@ -146,52 +164,71 @@ export default function Navbar() {
           <div className="px-2 pt-2 pb-3 space-y-1">
             {user ? (
               <>
-                <Link
-                  to="/dashboard"
-                  className={`block px-3 py-2 rounded-md text-base font-medium ${
-                    isActive('/dashboard') 
-                      ? 'bg-blue-100 text-blue-700' 
-                      : 'text-gray-700 hover:text-blue-600'
-                  }`}
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Dashboard
-                </Link>
-                <Link
-                  to="/profile"
-                  className={`block px-3 py-2 rounded-md text-base font-medium ${
-                    isActive('/profile') 
-                      ? 'bg-blue-100 text-blue-700' 
-                      : 'text-gray-700 hover:text-blue-600'
-                  }`}
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Profile
-                </Link>
-                {!hasActiveApplication && (
+                {!isStaff && (
                   <Link
-                    to="/apply"
+                    to="/dashboard"
                     className={`block px-3 py-2 rounded-md text-base font-medium ${
-                      isActive('/apply') 
-                        ? 'bg-blue-100 text-blue-700' 
+                      isActive('/dashboard')
+                        ? 'bg-blue-100 text-blue-700'
                         : 'text-gray-700 hover:text-blue-600'
                     }`}
                     onClick={() => setIsMenuOpen(false)}
                   >
-                    Apply
+                    Dashboard
                   </Link>
                 )}
-                <Link
-                  to="/collection-points"
-                  className={`block px-3 py-2 rounded-md text-base font-medium ${
-                    isActive('/collection-points') 
-                      ? 'bg-blue-100 text-blue-700' 
-                      : 'text-gray-700 hover:text-blue-600'
-                  }`}
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Collection Points
-                </Link>
+                {isStaff && (
+                  <Link
+                    to="/official"
+                    className={`block px-3 py-2 rounded-md text-base font-medium ${
+                      isActive('/official')
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'text-gray-700 hover:text-blue-600'
+                    }`}
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Official Dashboard
+                  </Link>
+                )}
+                {!isStaff && (
+                  <>
+                    <Link
+                      to="/profile"
+                      className={`block px-3 py-2 rounded-md text-base font-medium ${
+                        isActive('/profile')
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'text-gray-700 hover:text-blue-600'
+                      }`}
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      Profile
+                    </Link>
+                    {!hasActiveApplication && (
+                      <Link
+                        to="/apply"
+                        className={`block px-3 py-2 rounded-md text-base font-medium ${
+                          isActive('/apply')
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'text-gray-700 hover:text-blue-600'
+                        }`}
+                        onClick={() => setIsMenuOpen(false)}
+                      >
+                        Apply
+                      </Link>
+                    )}
+                    <Link
+                      to="/collection-points"
+                      className={`block px-3 py-2 rounded-md text-base font-medium ${
+                        isActive('/collection-points')
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'text-gray-700 hover:text-blue-600'
+                      }`}
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      Collection Points
+                    </Link>
+                  </>
+                )}
                 {isAdmin && (
                   <Link
                     to="/admin"

@@ -11,6 +11,7 @@ import Dashboard from './pages/Dashboard';
 import CollectionPoints from './pages/CollectionPoints';
 import AdminDashboard from './pages/AdminDashboard';
 import OfficialDashboard from './pages/OfficialDashboard';
+import OfficerRegister from './pages/OfficerRegister';
 import CollectionInterface from './pages/CollectionInterface';
 import Profile from './pages/Profile';
 
@@ -29,8 +30,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading, isAdmin } = useAuth();
-  
+  const { user, loading, isAdmin, isStaff } = useAuth();
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -38,12 +39,18 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  
-  // Redirect authenticated users to appropriate dashboard
+
+  // Redirect authenticated users to appropriate dashboard based on role
   if (user) {
-    return <Navigate to={isAdmin ? "/admin" : "/dashboard"} />;
+    if (isAdmin) {
+      return <Navigate to="/admin" />;
+    } else if (isStaff) {
+      return <Navigate to="/official" />;
+    } else {
+      return <Navigate to="/dashboard" />;
+    }
   }
-  
+
   return <>{children}</>;
 }
 
@@ -65,6 +72,7 @@ function App() {
                 <Route path="/collection-points" element={<ProtectedRoute><CollectionPoints /></ProtectedRoute>} />
                 <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
                 <Route path="/official" element={<ProtectedRoute><OfficialDashboard /></ProtectedRoute>} />
+                <Route path="/officerRegister" element={<ProtectedRoute><OfficerRegister /></ProtectedRoute>} />
                 <Route path="/collection-interface" element={<CollectionInterface />} />
               </Routes>
             </main>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { Eye, EyeOff, LogIn } from 'lucide-react';
@@ -11,7 +11,7 @@ interface LoginForm {
 }
 
 export default function Login() {
-  const { signIn } = useAuth();
+  const { signIn, user, isAdmin, isStaff, loading } = useAuth();
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -22,29 +22,46 @@ export default function Login() {
     handleSubmit,
     formState: { errors }
   } = useForm<LoginForm>();
+  
+
+  // Effect to handle redirection after auth state changes
+  useEffect(() => {
+    if (user && !loading) {
+      console.log('Auth state updated - Redirecting:', {
+        email: user.email,
+        isAdmin,
+        isStaff
+      });
+
+      if (isAdmin) {
+        navigate('/admin');
+      } else if (isStaff) {
+        navigate('/official');
+      } else {
+        navigate('/dashboard');
+      }
+    }
+  }, [user, isAdmin, isStaff, loading, navigate]);
 
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true);
     setError('');
 
     try {
-      const { error } = await signIn(data.email, data.password);
-      
-      if (error) {
-        setError(error.message);
-      } else {
-        // Wait a moment for auth context to update
-        setTimeout(() => {
-          // Check if user is admin and redirect accordingly
-          const adminEmails = ['admin@lesotho.gov', 'admin@gov.ls'];
-          const isAdminUser = adminEmails.includes(data.email) || data.email.includes('admin');
-          navigate(isAdminUser ? '/admin' : '/dashboard');
-        }, 100);
+      const { error: signInError } = await signIn(data.email, data.password);
+
+      if (signInError) {
+        setError(signInError.message);
+        setIsLoading(false);
+        return;
       }
+
+      // The useEffect above will handle the redirection
+      // when the auth state updates
+      
     } catch (err) {
       console.error('Login error:', err);
       setError('Login failed. Please try again.');
-    } finally {
       setIsLoading(false);
     }
   };
@@ -141,6 +158,16 @@ export default function Login() {
               </Link>
             </p>
           </div>
+
+          {/* Debug info - remove in production */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="text-center text-xs text-gray-400 border-t pt-4">
+              <p>Debug: {loading ? 'Loading...' : 'Ready'}</p>
+              <p>User: {user ? user.email : 'None'}</p>
+              <p>Admin: {isAdmin ? 'Yes' : 'No'}</p>
+              <p>Staff: {isStaff ? 'Yes' : 'No'}</p>
+            </div>
+          )}
         </form>
       </div>
     </div>
