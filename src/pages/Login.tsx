@@ -11,7 +11,7 @@ interface LoginForm {
 }
 
 export default function Login() {
-  const { signIn } = useAuth();
+  const { signIn, isAdmin, isStaff } = useAuth();
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -29,17 +29,20 @@ export default function Login() {
 
     try {
       const { error } = await signIn(data.email, data.password);
-      
+
       if (error) {
         setError(error.message);
       } else {
-        // Wait a moment for auth context to update
+        // Wait a moment for auth context to update with user role
         setTimeout(() => {
-          // Check if user is admin and redirect accordingly
-          const adminEmails = ['admin@lesotho.gov', 'admin@gov.ls'];
-          const isAdminUser = adminEmails.includes(data.email) || data.email.includes('admin');
-          navigate(isAdminUser ? '/admin' : '/dashboard');
-        }, 100);
+          if (isAdmin) {
+            navigate('/admin');
+          } else if (isStaff) {
+            navigate('/official');
+          } else {
+            navigate('/dashboard');
+          }
+        }, 300);
       }
     } catch (err) {
       console.error('Login error:', err);

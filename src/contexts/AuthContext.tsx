@@ -23,6 +23,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, userData: SignUpData) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
   isAdmin: boolean;
+  isStaff: boolean;
   userProfile: UserProfile | null;
 }
 
@@ -40,6 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isStaff, setIsStaff] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
@@ -67,6 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
           setUserProfile(null);
           setIsAdmin(false);
+          setIsStaff(false);
         }
         
         setLoading(false);
@@ -83,21 +86,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .select('*')
         .eq('user_id', userId)
         .single();
-      
+
       setUserProfile(profile);
       // Check if user is admin based on email or profile role
       const adminEmails = ['admin@lesotho.gov', 'admin@gov.ls'];
-      const isAdminUser = adminEmails.includes(user?.email || '') || 
-                         profile?.role === 'admin' || 
+      const isAdminUser = adminEmails.includes(user?.email || '') ||
+                         profile?.role === 'admin' ||
                          !!user?.email?.includes('admin');
       setIsAdmin(isAdminUser);
+
+      // Check if user is staff (passport officer)
+      const isStaffUser = profile?.role === 'staff';
+      setIsStaff(isStaffUser);
     } catch (error) {
       console.error('Error fetching user profile:', error);
       // Fallback admin check if profile fetch fails
       const adminEmails = ['admin@lesotho.gov', 'admin@gov.ls'];
-      const isAdminUser = adminEmails.includes(user?.email || '') || 
+      const isAdminUser = adminEmails.includes(user?.email || '') ||
                          !!user?.email?.includes('admin');
       setIsAdmin(isAdminUser);
+      setIsStaff(false);
     }
   };
   const signIn = async (email: string, password: string) => {
@@ -120,6 +128,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
     setUserProfile(null);
     setIsAdmin(false);
+    setIsStaff(false);
   };
 
   const value = {
@@ -129,6 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signUp,
     signOut,
     isAdmin,
+    isStaff,
     userProfile
   };
 

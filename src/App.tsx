@@ -29,8 +29,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading, isAdmin } = useAuth();
-  
+  const { user, loading, isAdmin, isStaff } = useAuth();
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -38,12 +38,18 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  
-  // Redirect authenticated users to appropriate dashboard
+
+  // Redirect authenticated users to appropriate dashboard based on role
   if (user) {
-    return <Navigate to={isAdmin ? "/admin" : "/dashboard"} />;
+    if (isAdmin) {
+      return <Navigate to="/admin" />;
+    } else if (isStaff) {
+      return <Navigate to="/official" />;
+    } else {
+      return <Navigate to="/dashboard" />;
+    }
   }
-  
+
   return <>{children}</>;
 }
 
