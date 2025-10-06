@@ -9,6 +9,7 @@ import StatusTimeline from '../components/dashboard/StatusTimeline';
 import type { Database } from '../lib/supabase';
 
 type Application = Database['public']['Tables']['passport_applications']['Row'];
+type BiometricsAppointment = Database['public']['Tables']['biometrics_appointments']['Row'];
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -28,22 +29,81 @@ export default function Dashboard() {
     reference_number: ''
   });
   const [isBooking, setIsBooking] = useState(false);
+  const [existingAppointments, setExistingAppointments] = useState<BiometricsAppointment[]>([]);
+  const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
 
   // Added state for rejection modal
   const [showRejectionModal, setShowRejectionModal] = useState(false);
-  // no separate rejectionMessage state — compute from selectedApplication when needed
 
   useEffect(() => {
     if (!user) return;
-    // only refresh when user changes / on mount; avoid continuous calls if refreshApplications is unstable
     refreshApplications();
+    loadExistingAppointments();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  const hasActiveApplication = applications.some(app =>
-    ['submitted', 'under_review', 'approved'].includes(app.status)
-  );
+  // Load all existing appointments to check for conflicts
+  const loadExistingAppointments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('biometrics_appointments')
+        .select('*')
+        .gte('date', new Date().toISOString().split('T')[0]);
 
+      if (!error && data) {
+        setExistingAppointments(data);
+      }
+    } catch (error) {
+      console.error('Error loading appointments:', error);
+    }
+  };
+
+  // Function to check if a date is weekend
+  const isWeekend = (dateString: string) => {
+    const date = new Date(dateString);
+    const day = date.getDay();
+    return day === 0 || day === 6; // 0 = Sunday, 6 = Saturday
+  };
+
+  // Function to get available time slots for selected date
+  const getAvailableTimeSlots = (selectedDate: string) => {
+    const allTimeSlots = ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00'];
+    
+    if (!selectedDate) return allTimeSlots;
+
+    // Get appointments for the selected date
+    const appointmentsOnDate = existingAppointments.filter(
+      appointment => appointment.date === selectedDate
+    );
+
+    // Get booked time slots
+    const bookedTimeSlots = appointmentsOnDate.map(appointment => appointment.time);
+
+    // Filter out booked time slots
+    const availableSlots = allTimeSlots.filter(slot => !bookedTimeSlots.includes(slot));
+    
+    return availableSlots;
+  };
+
+  // Update available time slots when date changes
+  useEffect(() => {
+    if (appointmentData.date) {
+      const slots = getAvailableTimeSlots(appointmentData.date);
+      setAvailableTimeSlots(slots);
+      
+      // If current selected time is not available, clear it
+      if (appointmentData.time && !slots.includes(appointmentData.time)) {
+        setAppointmentData(prev => ({ ...prev, time: '' }));
+      }
+    } else {
+      setAvailableTimeSlots(['09:00', '10:00', '11:00', '14:00', '15:00', '16:00']);
+    }
+  }, [appointmentData.date, existingAppointments]);
+
+  const hasActiveApplication = applications.some(app =>
+    ['submitted', 'under_review', 'approved', 'appointment_booked'].includes(app.status)
+  );
+  
   // Add error handling for missing data
   const safeApplications = applications || [];
   const safeStats = {
@@ -54,69 +114,219 @@ export default function Dashboard() {
     collected: safeApplications.filter(app => app.status === 'collected').length
   };
 
+  // Function to handle opening appointment modal with prefilled data
+  const handleOpenAppointmentModal = async (application: Application) => {
+    setSelectedApplication(application);
+    setAppointmentData({
+      date: '',
+      time: '',
+      reference_number: application.reference_number
+    });
+    
+    // Refresh appointments data when opening modal
+    await loadExistingAppointments();
+    setShowAppointmentModal(true);
+  };
+
+  // Function to handle closing modal
+  const handleCloseModal = () => {
+    setShowAppointmentModal(false);
+    // Only reset date and time, keep reference number for next time
+    setAppointmentData(prev => ({
+      ...prev,
+      date: '',
+      time: ''
+    }));
+    setAvailableTimeSlots(['09:00', '10:00', '11:00', '14:00', '15:00', '16:00']);
+  };
+
+  // Function to handle date change with weekend validation
+  const handleDateChange = (date: string) => {
+    if (date && isWeekend(date)) {
+      alert('Appointments are not available on weekends. Please select a weekday (Monday to Friday).');
+      return;
+    }
+    setAppointmentData(prev => ({ ...prev, date, time: '' }));
+  };
+
   const bookAppointment = async () => {
-    if (!selectedApplication || !appointmentData.date || !appointmentData.time || !appointmentData.reference_number) {
-      alert('Please fill in all appointment details');
-      return;
+  if (!selectedApplication || !appointmentData.date || !appointmentData.time || !appointmentData.reference_number) {
+    alert('Please fill in all appointment details');
+    return;
+  }
+
+  if (appointmentData.reference_number !== selectedApplication.reference_number) {
+    alert('Reference number does not match your application');
+    return;
+  }
+
+  // Check if selected date is weekend
+  if (isWeekend(appointmentData.date)) {
+    alert('Appointments are not available on weekends. Please select a weekday.');
+    return;
+  }
+
+  // Check if time slot is still available (double-check)
+  const isTimeSlotAvailable = getAvailableTimeSlots(appointmentData.date).includes(appointmentData.time);
+  if (!isTimeSlotAvailable) {
+    alert('This time slot is no longer available. Please select another time.');
+    await loadExistingAppointments(); // Refresh appointments
+    return;
+  }
+
+  // FIXED: Only prevent multiple appointments for ACTIVE applications
+  // Check if user has existing future appointment for ACTIVE applications only
+  try {
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    
+    // Get all user's applications to check which ones are active
+    const { data: userApplications, error: appsError } = await supabase
+      .from('passport_applications')
+      .select('id, status')
+      .eq('user_id', user?.id);
+
+    if (appsError) {
+      console.error('Error fetching user applications:', appsError);
     }
 
-    if (appointmentData.reference_number !== selectedApplication.reference_number) {
-      alert('Reference number does not match your application');
-      return;
-    }
+    // Find active application IDs (applications that are not completed)
+    const activeApplicationIds = userApplications
+      ?.filter(app => ['submitted', 'under_review', 'approved', 'appointment_booked'].includes(app.status))
+      .map(app => app.id) || [];
 
-    // Prevent multiple future appointments per user
-    try {
-      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-      const { data: existingAppointments, error: fetchError } = await supabase
+    if (activeApplicationIds.length > 0) {
+      // Check if user has appointments for any ACTIVE applications
+      const { data: userAppointments, error: fetchError } = await supabase
         .from('biometrics_appointments')
-        .select('id,date')
+        .select('id, date, application_id')
         .eq('user_id', user?.id)
+        .in('application_id', activeApplicationIds) // Only check appointments for active applications
         .gte('date', today); // any appointment on or after today
 
-      if (!fetchError && Array.isArray(existingAppointments) && existingAppointments.length > 0) {
-        alert('You already have a biometrics appointment scheduled. You may book a new appointment only after your current appointment date has passed.');
-        return;
-      }
-    } catch (err) {
-      // ignore — we'll show a friendly message below if booking fails
-      console.warn('Could not check existing appointments:', err);
-    }
+      if (!fetchError && Array.isArray(userAppointments) && userAppointments.length > 0) {
+        // Check if the appointment is for a DIFFERENT active application
+        const otherActiveAppointments = userAppointments.filter(
+          appointment => appointment.application_id !== selectedApplication.id
+        );
 
-    try {
-      setIsBooking(true);
-      const { error: insertError } = await supabase
-        .from('biometrics_appointments')
-        .insert([{
-          application_id: selectedApplication.id,
-          user_id: selectedApplication.user_id,
-          reference_number: appointmentData.reference_number,
-          date: appointmentData.date,
-          time: appointmentData.time,
-          created_at: new Date().toISOString()
-        }]);
-
-      if (insertError) {
-        // existing error handling...
-        console.error('Booking error:', insertError);
-        if (insertError.code === 'PGRST205' || (insertError.message && String(insertError.message).includes('Could not find the table'))) {
-          alert('Booking currently unavailable: appointments table not found on server. Please contact support.');
-        } else {
-          alert('Could not save appointment to server. If the problem persists contact support.');
+        if (otherActiveAppointments.length > 0) {
+          alert('You already have a biometrics appointment scheduled for another active application. You may book a new appointment only after your current appointment date has passed.');
+          return;
         }
-      } else {
-        alert(`Appointment booked successfully for ${appointmentData.date} at ${appointmentData.time}. You will receive a confirmation email shortly.`);
-        setShowAppointmentModal(false);
-        setAppointmentData({ date: '', time: '', reference_number: '' });
-        refreshApplications();
+        
+        // If it's for the SAME application, allow rebooking (user might want to reschedule)
+        const sameAppAppointments = userAppointments.filter(
+          appointment => appointment.application_id === selectedApplication.id
+        );
+        
+        if (sameAppAppointments.length > 0) {
+          // Allow rebooking the same application (user might want to change date/time)
+          console.log('User is rebooking the same application');
+        }
       }
-    } catch (error) {
-      console.error('Error booking appointment:', error);
-      alert('Error booking appointment. Please try again.');
-    } finally {
-      setIsBooking(false);
     }
-  };
+  } catch (err) {
+    console.warn('Could not check existing appointments:', err);
+  }
+
+  try {
+    setIsBooking(true);
+    
+    // Log the booking attempt for debugging
+    console.log('Attempting to book appointment:', {
+      date: appointmentData.date,
+      time: appointmentData.time,
+      reference: appointmentData.reference_number
+    });
+
+    const { data, error: insertError } = await supabase
+      .from('biometrics_appointments')
+      .insert([{
+        application_id: selectedApplication.id,
+        user_id: selectedApplication.user_id,
+        reference_number: appointmentData.reference_number,
+        date: appointmentData.date,
+        time: appointmentData.time,
+        created_at: new Date().toISOString()
+      }])
+      .select();
+
+    if (insertError) {
+      console.error('Insert error details:', insertError);
+      
+      // Enhanced error handling with specific messages
+      if (insertError.code === 'PGRST205' || (insertError.message && String(insertError.message).includes('Could not find the table'))) {
+        alert('Booking service is currently unavailable. Please try again later or contact support.');
+      } else if (insertError.code === '23505') {
+        // Unique constraint violation - determine which constraint
+        if (insertError.message?.includes('date_time_key') || 
+            insertError.message?.includes('date, time') ||
+            insertError.details?.includes('date_time_key')) {
+          alert('⏰ This time slot has just been taken by another applicant. Please select a different date or time.');
+        } else if (insertError.message?.includes('application_id') || 
+                   insertError.message?.includes('biometrics_appointments_application_id_key')) {
+          alert('📋 This application already has an appointment booked. If you need to reschedule, please contact support.');
+        } else {
+          alert('This time slot is no longer available. Please select a different time.');
+        }
+        
+        // Refresh the appointments data to show current availability
+        await loadExistingAppointments();
+        
+        // Also update available time slots for the current date
+        if (appointmentData.date) {
+          const updatedSlots = getAvailableTimeSlots(appointmentData.date);
+          setAvailableTimeSlots(updatedSlots);
+          
+          // Clear the selected time since it's no longer available
+          setAppointmentData(prev => ({ ...prev, time: '' }));
+        }
+        
+      } else if (insertError.code === '42501') {
+        alert('Permission denied. Please make sure you are logged in properly.');
+      } else {
+        alert('Failed to book appointment. Please try again or contact support if the problem persists.');
+      }
+      return;
+    }
+
+    // Success case - appointment booked
+    console.log('Appointment created successfully:', data);
+
+    // Send appointment confirmation email
+    try {
+      const emailResponse = await supabase.functions.invoke('email_service', {
+        body: {
+          recipient_email: user?.email || selectedApplication.email,
+          status: 'appointment_booked',
+          name: `${selectedApplication.first_name} ${selectedApplication.last_name}`,
+          reference_number: selectedApplication.reference_number,
+          appointment_date: appointmentData.date,
+          appointment_time: appointmentData.time
+        }
+      });
+      
+      if (emailResponse.error) {
+        console.error('Email notification error:', emailResponse.error);
+      } else {
+        console.log('Confirmation email sent successfully');
+      }
+    } catch (emailError) {
+      console.error('Failed to send confirmation email:', emailError);
+    }
+
+    alert(`✅ Appointment booked successfully!\n\nDate: ${appointmentData.date}\nTime: ${appointmentData.time}\n\nYou will receive a confirmation email shortly.`);
+    await loadExistingAppointments(); // Refresh appointments after booking
+    handleCloseModal();
+    refreshApplications();
+    
+  } catch (error) {
+    console.error('Unexpected error booking appointment:', error);
+    alert('An unexpected error occurred. Please try again.');
+  } finally {
+    setIsBooking(false);
+  }
+};
 
   const filteredApplications = applications.filter(app =>
     app.reference_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -257,8 +467,7 @@ export default function Dashboard() {
                 onClick={() => {
                   const approvedApp = applications.find(app => app.status === 'approved');
                   if (approvedApp) {
-                    setSelectedApplication(approvedApp);
-                    setShowAppointmentModal(true);
+                    handleOpenAppointmentModal(approvedApp);
                   }
                 }}
                 className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center"
@@ -317,14 +526,7 @@ export default function Dashboard() {
                   {application.status === 'approved' && (
                     <button
                       type="button"
-                      onClick={() => {
-                        setSelectedApplication(application);
-                        // prefill reference number
-                        setAppointmentData(prev => ({ ...prev, reference_number: application.reference_number }));
-                        // show info modal first (we reuse showAppointmentModal to book)
-                        // open a small info prompt: set showAppointmentModal to true so user can pick date/time
-                        setShowAppointmentModal(true);
-                      }}
+                      onClick={() => handleOpenAppointmentModal(application)}
                       className="ml-2 p-2 rounded-full text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       aria-label="Appointment info"
                       title="Make biometrics appointment"
@@ -353,9 +555,9 @@ export default function Dashboard() {
                 <input
                   type="text"
                   value={appointmentData.reference_number}
-                  onChange={(e) => setAppointmentData({...appointmentData, reference_number: e.target.value})}
-                  placeholder="Enter your reference number"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  readOnly
+                  disabled
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-700 cursor-not-allowed"
                 />
               </div>
 
@@ -366,10 +568,13 @@ export default function Dashboard() {
                 <input
                   type="date"
                   value={appointmentData.date}
-                  onChange={(e) => setAppointmentData({...appointmentData, date: e.target.value})}
+                  onChange={(e) => handleDateChange(e.target.value)}
                   min={new Date().toISOString().split('T')[0]}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Weekends (Saturday & Sunday) are not available for appointments
+                </p>
               </div>
 
               <div>
@@ -380,21 +585,34 @@ export default function Dashboard() {
                   value={appointmentData.time}
                   onChange={(e) => setAppointmentData({...appointmentData, time: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={!appointmentData.date}
                 >
                   <option value="">Select time</option>
-                  <option value="09:00">09:00 AM</option>
-                  <option value="10:00">10:00 AM</option>
-                  <option value="11:00">11:00 AM</option>
-                  <option value="14:00">02:00 PM</option>
-                  <option value="15:00">03:00 PM</option>
-                  <option value="16:00">04:00 PM</option>
+                  {availableTimeSlots.map(slot => (
+                    <option key={slot} value={slot}>
+                      {slot === '09:00' ? '09:00 AM' :
+                       slot === '10:00' ? '10:00 AM' :
+                       slot === '11:00' ? '11:00 AM' :
+                       slot === '14:00' ? '02:00 PM' :
+                       slot === '15:00' ? '03:00 PM' :
+                       slot === '16:00' ? '04:00 PM' : slot}
+                    </option>
+                  ))}
                 </select>
+                {appointmentData.date && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {availableTimeSlots.length === 0 
+                      ? 'No time slots available for this date. Please select another date.'
+                      : `${availableTimeSlots.length} time slot(s) available`
+                    }
+                  </p>
+                )}
               </div>
             </div>
 
             <div className="flex justify-end space-x-3 mt-6">
               <button
-                onClick={() => setShowAppointmentModal(false)}
+                onClick={handleCloseModal}
                 className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
               >
                 Cancel
@@ -402,9 +620,9 @@ export default function Dashboard() {
               <button
                 onClick={bookAppointment}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors"
-                disabled={isBooking}
+                disabled={isBooking || !appointmentData.date || !appointmentData.time}
               >
-                Book Appointment
+                {isBooking ? 'Booking...' : 'Book Appointment'}
               </button>
             </div>
           </div>

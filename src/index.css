@@ -6,9 +6,9 @@
 body {
   background: linear-gradient(135deg, 
     #0066cc 0%,     /* Blue */
-    #ffffff 25%,    /* White */
-    #000000 50%,    /* Black */
-    #ffffff 75%,    /* White */
+   /* #ffffff 25%,    /* White */
+    #dad8d8 50%,    /* Black */
+   /* #ffffff 75%,    /* White */
     #00cc00 100%    /* Green */
   );
   background-attachment: fixed;
