@@ -372,20 +372,20 @@ export default function Dashboard() {
         {/* Top nav: Admin (only visible to admins) then Dashboard */}
         <div className="mb-4">
           <nav className="flex items-center space-x-3">
-            {isAdminUser && (
+            {/* {isAdminUser && (
               <Link
                 to="/admin"
                 className="px-3 py-2 rounded-md text-sm font-medium bg-gray-100 hover:bg-gray-200"
               >
                 Admin
               </Link>
-            )}
-            <Link
+            )} */}
+            {/* <Link
               to="/dashboard"
               className="px-3 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700"
             >
               Dashboard
-            </Link>
+            </Link> */}
           </nav>
         </div>
       </div>

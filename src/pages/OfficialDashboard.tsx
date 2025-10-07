@@ -15,15 +15,24 @@ interface Application {
   created_at: string;
   collection_point_id: string;
   rejection_reason?: string;
+  collection_point_name?: string;
+  collection_point_district?: string;
 }
 
 interface BiometricsAppointment {
   id: string;
   application_id: string;
-  appointment_date: string;
-  appointment_time: string;
+  date: string; // Changed from appointment_date to date
+  time: string; // Changed from appointment_time to time
   status: string;
   notes?: string;
+  reference_number: string;
+  created_at: string;
+  passport_applications?: {
+    first_name: string;
+    last_name: string;
+    collection_point_id: string;
+  };
 }
 
 interface Official {
@@ -65,61 +74,203 @@ export default function OfficialDashboard() {
   const fetchOfficialData = async () => {
     if (!user) return;
 
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('role', 'staff')
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('role', 'staff')
+        .single();
 
-    if (error) {
-      console.error("Error fetching official data:", error);
-    } else if (data) {
-      // Map profile to official format
-      setOfficial({
-        id: data.id,
-        first_name: data.first_name,
-        last_name: data.last_name,
-        district: data.district,
-        employee_id: data.national_id
-      });
+      if (error) {
+        console.error("Error fetching official data:", error);
+      } else if (data) {
+        setOfficial({
+          id: data.id,
+          first_name: data.first_name,
+          last_name: data.last_name,
+          district: data.district,
+          employee_id: data.national_id
+        });
+      }
+    } catch (error) {
+      console.error("Error in fetchOfficialData:", error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const fetchApplications = async () => {
     if (!official) return;
 
-    const { data } = await supabase
-      .from('passport_applications')
-      .select(`
-        *,
-        collection_points!inner(district_enum)
-      `)
-      .eq('collection_points.district_enum', official.district)
-      .order('created_at', { ascending: false });
+    try {
+      console.log("Fetching applications for official district:", official.district);
 
-    setApplications(data || []);
+      // Get the first word of the official's district for flexible matching
+      const officialDistrictFirstWord = official.district.split(' ')[0].toLowerCase();
+      console.log("Using first word for matching:", officialDistrictFirstWord);
+
+      // First, get all collection points to understand the structure
+      const { data: allCollectionPoints, error: cpError } = await supabase
+        .from('collection_points')
+        .select('*');
+
+      if (cpError) {
+        console.error("Error fetching collection points:", cpError);
+        return;
+      }
+
+      console.log("All collection points:", allCollectionPoints);
+
+      // Find collection points that match the official's district
+      const matchingCollectionPoints = allCollectionPoints.filter(cp => {
+        const cpDistrict = cp.district?.toLowerCase() || '';
+        const cpName = cp.name?.toLowerCase() || '';
+        
+        return (
+          cpDistrict === official.district.toLowerCase() ||
+          cpName === official.district.toLowerCase() ||
+          cpDistrict.includes(officialDistrictFirstWord) ||
+          cpName.includes(officialDistrictFirstWord) ||
+          cpDistrict.includes(official.district.toLowerCase()) ||
+          cpName.includes(official.district.toLowerCase())
+        );
+      });
+
+      console.log("Matching collection points:", matchingCollectionPoints);
+
+      if (matchingCollectionPoints.length === 0) {
+        console.log("No matching collection points found for district:", official.district);
+        setApplications([]);
+        return;
+      }
+
+      const collectionPointIds = matchingCollectionPoints.map(cp => cp.id);
+
+      // Get applications for those collection points
+      const { data: applicationsData, error: appsError } = await supabase
+        .from('passport_applications')
+        .select('*')
+        .in('collection_point_id', collectionPointIds)
+        .order('created_at', { ascending: false });
+
+      if (appsError) {
+        console.error("Error fetching applications:", appsError);
+        return;
+      }
+
+      // Enrich applications with collection point data
+      const enrichedApplications = (applicationsData || []).map(app => {
+        const collectionPoint = matchingCollectionPoints.find(cp => cp.id === app.collection_point_id);
+        return {
+          ...app,
+          collection_point_name: collectionPoint?.name || 'Unknown',
+          collection_point_district: collectionPoint?.district || 'Unknown'
+        };
+      });
+
+      console.log("Fetched and enriched applications:", enrichedApplications);
+      console.log(`Filtered applications: ${enrichedApplications.length} out of ${applicationsData?.length}`);
+
+      setApplications(enrichedApplications);
+    } catch (error) {
+      console.error("Error in fetchApplications:", error);
+    }
   };
 
   const fetchAppointments = async () => {
     if (!official) return;
 
-    const { data } = await supabase
-      .from('biometrics_appointments')
-      .select(`
-        *,
-        passport_applications!inner(
-          collection_point_id,
-          collection_points!inner(district_enum)
-        )
-      `)
-      .eq('passport_applications.collection_points.district_enum', official.district)
-      .order('appointment_date', { ascending: true });
+    try {
+      console.log("Fetching appointments for official district:", official.district);
 
-    setAppointments(data || []);
+      // Get the first word of the official's district for flexible matching
+      const officialDistrictFirstWord = official.district.split(' ')[0].toLowerCase();
+
+      // First, get all collection points
+      const { data: allCollectionPoints, error: cpError } = await supabase
+        .from('collection_points')
+        .select('*');
+
+      if (cpError) {
+        console.error("Error fetching collection points:", cpError);
+        return;
+      }
+
+      // Find collection points that match the official's district
+      const matchingCollectionPoints = allCollectionPoints.filter(cp => {
+        const cpDistrict = cp.district?.toLowerCase() || '';
+        const cpName = cp.name?.toLowerCase() || '';
+        
+        return (
+          cpDistrict === official.district.toLowerCase() ||
+          cpName === official.district.toLowerCase() ||
+          cpDistrict.includes(officialDistrictFirstWord) ||
+          cpName.includes(officialDistrictFirstWord) ||
+          cpDistrict.includes(official.district.toLowerCase()) ||
+          cpName.includes(official.district.toLowerCase())
+        );
+      });
+
+      if (matchingCollectionPoints.length === 0) {
+        console.log("No matching collection points found for appointments");
+        setAppointments([]);
+        return;
+      }
+
+      const collectionPointIds = matchingCollectionPoints.map(cp => cp.id);
+
+      // Get applications for those collection points
+      const { data: applicationsData, error: appsError } = await supabase
+        .from('passport_applications')
+        .select('id, first_name, last_name, collection_point_id')
+        .in('collection_point_id', collectionPointIds);
+
+      if (appsError) {
+        console.error("Error fetching applications for appointments:", appsError);
+        return;
+      }
+
+      if (!applicationsData || applicationsData.length === 0) {
+        setAppointments([]);
+        return;
+      }
+
+      const applicationIds = applicationsData.map(app => app.id);
+
+      // Get appointments for those applications - FIXED COLUMN NAMES
+      const { data: appointmentsData, error: aptError } = await supabase
+        .from('biometrics_appointments')
+        .select('*')
+        .in('application_id', applicationIds)
+        .order('date', { ascending: true }); // Changed from appointment_date to date
+
+      if (aptError) {
+        console.error("Error fetching appointments:", aptError);
+        return;
+      }
+
+      // Enrich appointments with application data
+      const enrichedAppointments = (appointmentsData || []).map(apt => {
+        const application = applicationsData.find(app => app.id === apt.application_id);
+        return {
+          ...apt,
+          passport_applications: application ? {
+            first_name: application.first_name,
+            last_name: application.last_name,
+            collection_point_id: application.collection_point_id
+          } : undefined
+        };
+      });
+
+      console.log("Fetched appointments:", enrichedAppointments);
+      setAppointments(enrichedAppointments);
+    } catch (error) {
+      console.error("Error in fetchAppointments:", error);
+    }
   };
 
+  // Rest of the functions remain the same (updateStatus, handleRejection, handleBiometricsCapture, etc.)
   const updateStatus = async (id: string, newStatus: string) => {
     if (newStatus === 'rejected') {
       setApplicationToReject(id);
@@ -127,26 +278,44 @@ export default function OfficialDashboard() {
       return;
     }
 
-    const { error } = await supabase
-      .from('passport_applications')
-      .update({ 
-        status: newStatus,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id);
+    try {
+      const { error } = await supabase
+        .from('passport_applications')
+        .update({ 
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id);
 
-    if (!error) {
-      await supabase
-        .from('application_status_updates')
-        .insert([{
-          application_id: id,
-          previous_status: applications.find(app => app.id === id)?.status,
-          new_status: newStatus,
-          notes: `Status updated to ${newStatus} by ${official?.first_name} ${official?.last_name}`,
-          updated_by: user?.id
-        }]);
+      if (!error) {
+        await supabase
+          .from('application_status_updates')
+          .insert([{
+            application_id: id,
+            previous_status: applications.find(app => app.id === id)?.status,
+            new_status: newStatus,
+            notes: `Status updated to ${newStatus} by ${official?.first_name} ${official?.last_name}`,
+            updated_by: user?.id
+          }]);
 
-      fetchApplications();
+        fetchApplications();
+        
+        // Show success notification
+        const successDiv = document.createElement('div');
+        successDiv.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50';
+        successDiv.textContent = 'Status updated successfully';
+        document.body.appendChild(successDiv);
+        setTimeout(() => successDiv.remove(), 3000);
+      } else {
+        throw error;
+      }
+    } catch (error) {
+      console.error("Error updating status:", error);
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50';
+      errorDiv.textContent = 'Error updating status';
+      document.body.appendChild(errorDiv);
+      setTimeout(() => errorDiv.remove(), 3000);
     }
   };
 
@@ -160,36 +329,42 @@ export default function OfficialDashboard() {
       return;
     }
 
-    const { error } = await supabase
-      .from('passport_applications')
-      .update({ 
-        status: 'rejected',
-        rejection_reason: rejectionReason,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', applicationToReject);
+    try {
+      const { error } = await supabase
+        .from('passport_applications')
+        .update({ 
+          status: 'rejected',
+          rejection_reason: rejectionReason,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', applicationToReject);
 
-    if (!error) {
-      await supabase
-        .from('application_status_updates')
-        .insert([{
-          application_id: applicationToReject,
-          previous_status: applications.find(app => app.id === applicationToReject)?.status,
-          new_status: 'rejected',
-          notes: rejectionReason,
-          updated_by: user?.id
-        }]);
+      if (!error) {
+        await supabase
+          .from('application_status_updates')
+          .insert([{
+            application_id: applicationToReject,
+            previous_status: applications.find(app => app.id === applicationToReject)?.status,
+            new_status: 'rejected',
+            notes: rejectionReason,
+            updated_by: user?.id
+          }]);
 
-      const successDiv = document.createElement('div');
-      successDiv.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50';
-      successDiv.textContent = 'Application rejected successfully';
-      document.body.appendChild(successDiv);
-      setTimeout(() => successDiv.remove(), 3000);
-      fetchApplications();
-      setShowRejectionModal(false);
-      setRejectionReason('');
-      setApplicationToReject(null);
-    } else {
+        const successDiv = document.createElement('div');
+        successDiv.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50';
+        successDiv.textContent = 'Application rejected successfully';
+        document.body.appendChild(successDiv);
+        setTimeout(() => successDiv.remove(), 3000);
+        
+        fetchApplications();
+        setShowRejectionModal(false);
+        setRejectionReason('');
+        setApplicationToReject(null);
+      } else {
+        throw error;
+      }
+    } catch (error) {
+      console.error("Error rejecting application:", error);
       const errorDiv = document.createElement('div');
       errorDiv.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50';
       errorDiv.textContent = 'Error rejecting application';
@@ -235,6 +410,8 @@ export default function OfficialDashboard() {
         setShowBiometricsModal(false);
         setPassportPhoto(null);
         setFingerprintData('');
+      } else {
+        throw error;
       }
     } catch (error) {
       console.error("Error capturing biometrics:", error);
@@ -254,6 +431,16 @@ export default function OfficialDashboard() {
     return matchesSearch && matchesStatus;
   });
 
+  // Debug info
+  useEffect(() => {
+    if (official) {
+      console.log("Current official:", official);
+      console.log("Applications count:", applications.length);
+      console.log("Appointments count:", appointments.length);
+    }
+  }, [official, applications, appointments]);
+
+  // Rest of the JSX remains exactly the same...
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -287,6 +474,9 @@ export default function OfficialDashboard() {
         <p className="text-gray-600">
           Welcome, {official.first_name} {official.last_name} - {official.district} District
         </p>
+        <p className="text-sm text-gray-500 mt-1">
+          Showing applications from {official.district} district ({applications.length} applications found)
+        </p>
       </div>
 
       {/* Statistics */}
@@ -311,7 +501,7 @@ export default function OfficialDashboard() {
             <div className="ml-4">
               <p className="text-sm text-gray-600">Today's Appointments</p>
               <p className="text-2xl font-bold text-gray-900">
-                {appointments.filter(apt => apt.appointment_date === new Date().toISOString().split('T')[0]).length}
+                {appointments.filter(apt => apt.date === new Date().toISOString().split('T')[0]).length}
               </p>
             </div>
           </div>
@@ -378,6 +568,9 @@ export default function OfficialDashboard() {
                   Reference
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Collection Point
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -401,6 +594,14 @@ export default function OfficialDashboard() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-mono text-gray-900">{application.reference_number}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-700">
+                      {application.collection_point_name || 'Unknown'}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {application.collection_point_district || 'Unknown district'}
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
@@ -458,6 +659,19 @@ export default function OfficialDashboard() {
             </tbody>
           </table>
         </div>
+
+        {filteredApplications.length === 0 && (
+          <div className="text-center py-8">
+            <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Applications Found</h3>
+            <p className="text-gray-600">
+              {applications.length === 0
+                ? `No applications found for ${official.district} district.`
+                : "No applications match your search criteria."
+              }
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Application Details Modal */}
@@ -484,6 +698,8 @@ export default function OfficialDashboard() {
                 <div><span className="font-medium">Email:</span> {selectedApplication.email}</div>
                 <div><span className="font-medium">Phone:</span> {selectedApplication.phone}</div>
                 <div><span className="font-medium">Status:</span> {selectedApplication.status}</div>
+                <div><span className="font-medium">Collection Point:</span> {selectedApplication.collection_point_name || 'Unknown'}</div>
+                <div><span className="font-medium">District:</span> {selectedApplication.collection_point_district || 'Unknown'}</div>
               </div>
               
               {selectedApplication.rejection_reason && (
