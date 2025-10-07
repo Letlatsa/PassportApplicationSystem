@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { Shield, Eye, EyeOff, User, ChevronDown } from 'lucide-react';
+import {Eye, EyeOff, User, ChevronDown } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import CoatOfArms from '../CoatOfArms.png';
 
@@ -17,16 +17,16 @@ interface RegisterForm {
 }
 
 const districts = [
-  'Butha-Buthe',
-  'Leribe', 
-  'Berea',
-  'Maseru',
-  'Mafeteng',
-  'Mohale\'s Hoek',
-  'Qacha\'s Nek',
-  'Quthing',
-  'Mokhotlong',
-  'Thaba-Tseka'
+  'Butha-Buthe District Office',
+  'Leribe District Office', 
+  'Berea District Office',
+  'Maseru Central Office',
+  'Mafeteng District Office',
+  'Mohale\'s Hoek District Office',
+  'Qacha\'s Nek District Office',
+  'Quthing District Office',
+  'Mokhotlong District Office',
+  'Thaba-Tseka District Office'
 ];
 
 export default function Register() {
@@ -64,7 +64,7 @@ const onSubmit = async (data: RegisterForm) => {
       phone: data.phone,
       position: data.position,
       district: data.district,
-      role: 'staff' // CRITICAL: This must be 'staff' for passport officers
+      role: 'staff'
     });
 
     if (error) {
@@ -85,6 +85,7 @@ const onSubmit = async (data: RegisterForm) => {
       }, 3000);
     }
   } catch (err) {
+    console.error('Registration error:', err);
     setError('Registration failed. Please try again.');
   } finally {
     setIsLoading(false);
@@ -116,7 +117,7 @@ const onSubmit = async (data: RegisterForm) => {
             </div>
             <h3 className="text-lg font-semibold text-green-800 mb-2">Account Created Successfully!</h3>
             <p className="text-green-700 mb-4">
-              Your account has been created successfully! Please check your email to verify your account before signing in.
+              Passport Officer account has been created successfully! They can check email to verify their account before signing in.
             </p>
             <Link
               to="/login"
