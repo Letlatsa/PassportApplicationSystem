@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { Eye, EyeOff, LogIn } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -11,8 +11,7 @@ interface LoginForm {
 }
 
 export default function Login() {
-  const { signIn, user, isAdmin, isStaff, loading } = useAuth();
-  const navigate = useNavigate();
+  const { signIn } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -24,24 +23,7 @@ export default function Login() {
   } = useForm<LoginForm>();
   
 
-  // Effect to handle redirection after auth state changes
-  useEffect(() => {
-    if (user && !loading) {
-      console.log('Auth state updated - Redirecting:', {
-        email: user.email,
-        isAdmin,
-        isStaff
-      });
-
-      if (isAdmin) {
-        navigate('/admin');
-      } else if (isStaff) {
-        navigate('/official');
-      } else {
-        navigate('/dashboard');
-      }
-    }
-  }, [user, isAdmin, isStaff, loading, navigate]);
+  // Redirection is now handled by the routing system in App.tsx
 
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true);
@@ -56,8 +38,7 @@ export default function Login() {
         return;
       }
 
-      // The useEffect above will handle the redirection
-      // when the auth state updates
+      // Redirection is handled by the routing system in App.tsx
       
     } catch (err) {
       console.error('Login error:', err);
@@ -160,14 +141,14 @@ export default function Login() {
           </div>
 
           {/* Debug info - remove in production */}
-          {process.env.NODE_ENV === 'development' && (
+          {/* {process.env.NODE_ENV === 'development' && (
             <div className="text-center text-xs text-gray-400 border-t pt-4">
               <p>Debug: {loading ? 'Loading...' : 'Ready'}</p>
               <p>User: {user ? user.email : 'None'}</p>
               <p>Admin: {isAdmin ? 'Yes' : 'No'}</p>
               <p>Staff: {isStaff ? 'Yes' : 'No'}</p>
             </div>
-          )}
+          )} */}
         </form>
       </div>
     </div>

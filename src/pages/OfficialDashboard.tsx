@@ -3,21 +3,13 @@ import { FileText, Users, Search, Filter, Calendar, Camera, Fingerprint, Upload,
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { format } from 'date-fns';
+import { sendNotificationEmail } from '../lib/notifications';
+import type { Database } from '../lib/supabase';
 
-interface Application {
-  id: string;
-  reference_number: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  phone: string;
-  status: string;
-  created_at: string;
-  collection_point_id: string;
-  rejection_reason?: string;
+type Application = Database['public']['Tables']['passport_applications']['Row'] & {
   collection_point_name?: string;
   collection_point_district?: string;
-}
+};
 
 interface BiometricsAppointment {
   id: string;
@@ -299,7 +291,18 @@ export default function OfficialDashboard() {
           }]);
 
         fetchApplications();
-        
+
+        // Send notification email to applicant
+        const application = applications.find(app => app.id === id);
+        if (application) {
+          try {
+            await sendNotificationEmail(application, newStatus);
+          } catch (emailError) {
+            console.error('Failed to send notification email:', emailError);
+            // Don't fail the status update if email fails
+          }
+        }
+
         // Show success notification
         const successDiv = document.createElement('div');
         successDiv.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50';
@@ -356,6 +359,17 @@ export default function OfficialDashboard() {
         document.body.appendChild(successDiv);
         setTimeout(() => successDiv.remove(), 3000);
         
+        // Send notification email to applicant
+        const application = applications.find(app => app.id === applicationToReject);
+        if (application) {
+          try {
+            await sendNotificationEmail(application, 'rejected');
+          } catch (emailError) {
+            console.error('Failed to send rejection notification email:', emailError);
+            // Don't fail the rejection if email fails
+          }
+        }
+
         fetchApplications();
         setShowRejectionModal(false);
         setRejectionReason('');
@@ -709,6 +723,27 @@ export default function OfficialDashboard() {
                   </p>
                 </div>
               )}
+
+              <div className="mt-6 border-t pt-6">
+                <button
+                  onClick={() => updateStatus(selectedApplication.id, 'approved')}
+                  className="w-full bg-green-600 text-white px-4 py-2 rounded-lg shadow hover:bg-green-700 transition-all"
+                >
+                  Approve Application
+                </button>
+                <button
+                  onClick={() => updateStatus(selectedApplication.id, 'rejected')}
+                  className="w-full bg-red-600 text-white px-4 py-2 rounded-lg shadow hover:bg-red-700 transition-all mt-2"
+                >
+                  Reject Application
+                </button>
+                <button
+                  onClick={() => setShowApplicationModal(false)}
+                  className="w-full bg-gray-300 text-gray-700 px-4 py-2 rounded-lg shadow hover:bg-gray-400 transition-all mt-2"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
