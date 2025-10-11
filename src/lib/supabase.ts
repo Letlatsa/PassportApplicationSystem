@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-key';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
@@ -27,6 +27,7 @@ export type Database = {
           id_document_url: string | null;
           birth_certificate_url: string | null;
           proof_of_address_url: string | null;
+          proof_of_payment_url: string | null;
           status: 'submitted' | 'under_review' | 'approved' | 'ready_for_collection' | 'collected' | 'rejected';
           collection_point_id: string | null;
           qr_code: string | null;
@@ -64,10 +65,10 @@ export type Database = {
       };
       notification_logs: {
         Row: {
-          id: string;
           application_id: string;
           type: 'sms' | 'email';
           recipient: string;
+        proof_of_payment_url: string | null;
           message: string;
           status: 'sent' | 'failed' | 'pending';
           sent_at: string | null;

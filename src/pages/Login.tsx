@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { Shield, Eye, EyeOff, LogIn } from 'lucide-react';
+import { Eye, EyeOff, LogIn } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import CoatOfArms from '../CoatOfArms.png';
 
 interface LoginForm {
   email: string;
@@ -11,7 +12,6 @@ interface LoginForm {
 
 export default function Login() {
   const { signIn } = useAuth();
-  const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -21,32 +21,42 @@ export default function Login() {
     handleSubmit,
     formState: { errors }
   } = useForm<LoginForm>();
+  
+
+  // Redirection is now handled by the routing system in App.tsx
 
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true);
     setError('');
 
     try {
-      const { error } = await signIn(data.email, data.password);
-      
-      if (error) {
-        setError(error.message);
-      } else {
-        navigate('/dashboard');
+      const { error: signInError } = await signIn(data.email, data.password);
+
+      if (signInError) {
+        setError(signInError.message);
+        setIsLoading(false);
+        return;
       }
+
+      // Redirection is handled by the routing system in App.tsx
+      
     } catch (err) {
+      console.error('Login error:', err);
       setError('Login failed. Please try again.');
-    } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8 bg-white/90 backdrop-blur-sm rounded-lg p-8 shadow-lg">
         <div className="text-center">
           <div className="flex justify-center mb-6">
-            <Shield className="h-12 w-12 text-blue-600" />
+            <img 
+              src={CoatOfArms} 
+              alt="Coat of Arms" 
+              className="h-16 w-auto"
+            />
           </div>
           <h2 className="text-3xl font-bold text-gray-900 mb-2">Welcome Back</h2>
           <p className="text-gray-600">
@@ -129,16 +139,17 @@ export default function Login() {
               </Link>
             </p>
           </div>
-        </form>
 
-        {/* Demo Accounts Info */}
-        <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-          <h3 className="text-sm font-semibold text-blue-800 mb-2">Demo Accounts</h3>
-          <div className="text-xs text-blue-700 space-y-1">
-            <p><strong>Admin:</strong> admin@lesotho.gov (password: admin123)</p>
-            <p><strong>User:</strong> user@example.com (password: user123)</p>
-          </div>
-        </div>
+          {/* Debug info - remove in production */}
+          {/* {process.env.NODE_ENV === 'development' && (
+            <div className="text-center text-xs text-gray-400 border-t pt-4">
+              <p>Debug: {loading ? 'Loading...' : 'Ready'}</p>
+              <p>User: {user ? user.email : 'None'}</p>
+              <p>Admin: {isAdmin ? 'Yes' : 'No'}</p>
+              <p>Staff: {isStaff ? 'Yes' : 'No'}</p>
+            </div>
+          )} */}
+        </form>
       </div>
     </div>
   );

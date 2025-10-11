@@ -3,10 +3,20 @@ import { QrCode, Search, User, CheckCircle, X } from 'lucide-react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { supabase } from '../lib/supabase';
 
+interface Application {
+  id: string;
+  first_name: string;
+  last_name: string;
+  reference_number: string;
+  email: string;
+  phone: string;
+  status: string;
+  created_at: string;
+}
+
 export default function CollectionInterface() {
-  const [scannedData, setScannedData] = useState('');
   const [manualRef, setManualRef] = useState('');
-  const [application, setApplication] = useState<any>(null);
+  const [application, setApplication] = useState<Application | null>(null);
   const [loading, setLoading] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
 
@@ -19,7 +29,6 @@ export default function CollectionInterface() {
 
       scanner.render(
         (decodedText) => {
-          setScannedData(decodedText);
           setShowScanner(false);
           scanner.clear();
           searchApplication(decodedText);
@@ -51,7 +60,7 @@ export default function CollectionInterface() {
       } else {
         setApplication(data);
       }
-    } catch (err) {
+    } catch {
       alert('Error searching for application');
       setApplication(null);
     } finally {
@@ -83,7 +92,6 @@ export default function CollectionInterface() {
       alert('Passport marked as collected successfully!');
       setApplication(null);
       setManualRef('');
-      setScannedData('');
     } else {
       alert('Error updating collection status');
     }

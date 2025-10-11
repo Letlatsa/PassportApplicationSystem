@@ -23,6 +23,15 @@ const statusSteps = [
   { key: 'collected', label: 'Collected', icon: CheckCircle }
 ];
 
+const STATUS_LABELS: Record<string, string> = {
+  submitted: 'Application submitted',
+  under_review: 'Application under review',
+  approved: 'Application approved',
+  ready_for_collection: 'Ready for collection',
+  collected: 'Collected',
+  rejected: 'Application rejected',
+};
+
 export default function StatusTimeline({ applicationId, currentStatus }: StatusTimelineProps) {
   const [updates, setUpdates] = useState<StatusUpdate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,6 +90,8 @@ export default function StatusTimeline({ applicationId, currentStatus }: StatusT
       </div>
     );
   }
+
+  const label = STATUS_LABELS[currentStatus] ?? currentStatus;
 
   return (
     <div className="p-6">
@@ -156,6 +167,9 @@ export default function StatusTimeline({ applicationId, currentStatus }: StatusT
           })}
         </div>
       )}
+      <div className="mt-4 text-sm text-gray-700">
+        {label}
+      </div>
     </div>
   );
 }

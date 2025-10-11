@@ -10,11 +10,14 @@ import Apply from './pages/Apply';
 import Dashboard from './pages/Dashboard';
 import CollectionPoints from './pages/CollectionPoints';
 import AdminDashboard from './pages/AdminDashboard';
+import OfficialDashboard from './pages/OfficialDashboard';
+import OfficerRegister from './pages/OfficerRegister';
 import CollectionInterface from './pages/CollectionInterface';
+import Profile from './pages/Profile';
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-  
+function ProtectedRoute({ children, allowedRoles = [] }: { children: React.ReactNode; allowedRoles?: string[] }) {
+  const { user, loading, isAdmin, isStaff } = useAuth();
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -22,13 +25,32 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  
-  return user ? <>{children}</> : <Navigate to="/login" />;
+
+  if (!user) {
+    return <Navigate to="/login" />;
+  }
+
+  // Check if user has permission for this route
+  const userRole = isAdmin ? 'admin' : isStaff ? 'staff' : 'user';
+  const hasPermission = allowedRoles.length === 0 || allowedRoles.includes(userRole);
+
+  if (!hasPermission) {
+    // Redirect to appropriate dashboard
+    if (isAdmin) {
+      return <Navigate to="/admin" />;
+    } else if (isStaff) {
+      return <Navigate to="/official" />;
+    } else {
+      return <Navigate to="/dashboard" />;
+    }
+  }
+
+  return <>{children}</>;
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-  
+  const { user, loading, isAdmin, isStaff } = useAuth();
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -36,8 +58,19 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  
-  return !user ? <>{children}</> : <Navigate to="/dashboard" />;
+
+  // Redirect authenticated users to appropriate dashboard based on role
+  if (user) {
+    if (isAdmin) {
+      return <Navigate to="/admin" />;
+    } else if (isStaff) {
+      return <Navigate to="/official" />;
+    } else {
+      return <Navigate to="/dashboard" />;
+    }
+  }
+
+  return <>{children}</>;
 }
 
 function App() {
@@ -45,7 +78,7 @@ function App() {
     <AuthProvider>
       <ApplicationProvider>
         <Router>
-          <div className="min-h-screen bg-gray-50">
+          <div className="min-h-screen">
             <Navbar />
             <main>
               <Routes>
@@ -53,9 +86,12 @@ function App() {
                 <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
                 <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
                 <Route path="/apply" element={<ProtectedRoute><Apply /></ProtectedRoute>} />
-                <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['user']}><Dashboard /></ProtectedRoute>} />
+                <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                 <Route path="/collection-points" element={<ProtectedRoute><CollectionPoints /></ProtectedRoute>} />
-                <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+                <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard /></ProtectedRoute>} />
+                <Route path="/official" element={<ProtectedRoute allowedRoles={['staff']}><OfficialDashboard /></ProtectedRoute>} />
+                <Route path="/officerRegister" element={<ProtectedRoute><OfficerRegister /></ProtectedRoute>} />
                 <Route path="/collection-interface" element={<CollectionInterface />} />
               </Routes>
             </main>
