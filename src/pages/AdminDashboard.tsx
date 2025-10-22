@@ -4,7 +4,8 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { Database } from '../lib/supabase';
 import { sendNotificationEmail } from '../lib/notifications';
-import { useNavigate } from 'react-router-dom'; // Add this import
+import { useNavigate } from 'react-router-dom';
+import { DocumentPreview } from '../components/DocumentViewer';
 
 type Application = Database['public']['Tables']['passport_applications']['Row'];
 
@@ -422,48 +423,70 @@ export default function AdminDashboard() {
   const getAppDocuments = (app: Application | null): Array<{ name?: string; url: string }> => {
     if (!app) return [];
     const r = app as unknown as Record<string, unknown>;
-    const candidateKeys = ['uploaded_documents', 'documents', 'attachments', 'files'];
-    for (const key of candidateKeys) {
-      const v = r[key];
-      if (!v) continue;
-      // if it's already an array
-      if (Array.isArray(v)) {
-        return v.map(item => {
-          if (typeof item === 'string') return { url: item };
-          const obj = item as Record<string, unknown>;
-          return { name: typeof obj.name === 'string' ? obj.name : undefined, url: String(obj.url ?? obj.path ?? obj.file_url ?? obj.key ?? '') };
-        }).filter(d => d.url);
-      }
-      // if it's a JSON string
-      if (typeof v === 'string') {
-        try {
-          const parsed = JSON.parse(v);
-          if (Array.isArray(parsed)) {
-            return parsed.map(item => {
-              if (typeof item === 'string') return { url: item };
-              const obj = item as Record<string, unknown>;
-              return { name: typeof obj.name === 'string' ? obj.name : undefined, url: String(obj.url ?? obj.path ?? obj.file_url ?? obj.key ?? '') };
-            }).filter(d => d.url);
-          }
-        } catch {
-          // not JSON — if the string looks like a URL, use it
-          if (v.startsWith('http') || v.startsWith('/')) return [{ url: v }];
-        }
-      }
-      // if it's an object with keys pointing to files
-      if (typeof v === 'object' && v !== null) {
-        const obj = v as Record<string, unknown>;
-        const urls: Array<{ name?: string; url: string }> = [];
-        for (const k of Object.keys(obj)) {
-          const val = obj[k];
-          if (typeof val === 'string' && (val.startsWith('http') || val.startsWith('/'))) {
-            urls.push({ name: k, url: val });
-          }
-        }
-        if (urls.length) return urls;
+    const documents: Array<{ name?: string; url: string }> = [];
+
+    // Check for specific document URL fields
+    const documentFields = [
+      { key: 'id_document_url', name: 'ID Document' },
+      { key: 'birth_certificate_url', name: 'Birth Certificate' },
+      { key: 'proof_of_address_url', name: 'Proof of Address' },
+      { key: 'proof_of_payment_url', name: 'Proof of Payment' },
+      { key: 'passport_photo_url', name: 'Passport Photo' }
+    ];
+
+    for (const field of documentFields) {
+      const url = r[field.key];
+      if (typeof url === 'string' && url.trim() && url.startsWith('http')) {
+        documents.push({ name: field.name, url });
       }
     }
-    return [];
+
+    // Fallback to legacy document handling
+    if (documents.length === 0) {
+      const candidateKeys = ['uploaded_documents', 'documents', 'attachments', 'files'];
+      for (const key of candidateKeys) {
+        const v = r[key];
+        if (!v) continue;
+        // if it's already an array
+        if (Array.isArray(v)) {
+          return v.map(item => {
+            if (typeof item === 'string') return { url: item };
+            const obj = item as Record<string, unknown>;
+            return { name: typeof obj.name === 'string' ? obj.name : undefined, url: String(obj.url ?? obj.path ?? obj.file_url ?? obj.key ?? '') };
+          }).filter(d => d.url);
+        }
+        // if it's a JSON string
+        if (typeof v === 'string') {
+          try {
+            const parsed = JSON.parse(v);
+            if (Array.isArray(parsed)) {
+              return parsed.map(item => {
+                if (typeof item === 'string') return { url: item };
+                const obj = item as Record<string, unknown>;
+                return { name: typeof obj.name === 'string' ? obj.name : undefined, url: String(obj.url ?? obj.path ?? obj.file_url ?? obj.key ?? '') };
+              }).filter(d => d.url);
+            }
+          } catch {
+            // not JSON — if the string looks like a URL, use it
+            if (v.startsWith('http') || v.startsWith('/')) return [{ url: v }];
+          }
+        }
+        // if it's an object with keys pointing to files
+        if (typeof v === 'object' && v !== null) {
+          const obj = v as Record<string, unknown>;
+          const urls: Array<{ name?: string; url: string }> = [];
+          for (const k of Object.keys(obj)) {
+            const val = obj[k];
+            if (typeof val === 'string' && (val.startsWith('http') || val.startsWith('/'))) {
+              urls.push({ name: k, url: val });
+            }
+          }
+          if (urls.length) return urls;
+        }
+      }
+    }
+
+    return documents;
   };
 
   // Check admin status more thoroughly
@@ -948,23 +971,8 @@ export default function AdminDashboard() {
 
                 <div className="col-span-2">
                   <p className="text-sm text-gray-500">Uploaded Documents</p>
-                  <div className="mt-2 space-y-1">
-                    {getAppDocuments(selectedApplication).length === 0 ? (
-                      <p className="text-sm text-gray-400">No documents uploaded</p>
-                    ) : (
-                      getAppDocuments(selectedApplication).map((d, i) => (
-                        <div key={i}>
-                          <a
-                            href={d.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline text-sm"
-                          >
-                            {d.name ?? d.url}
-                          </a>
-                        </div>
-                      ))
-                    )}
+                  <div className="mt-2">
+                    <DocumentPreview documents={getAppDocuments(selectedApplication)} />
                   </div>
                 </div>
               </div>

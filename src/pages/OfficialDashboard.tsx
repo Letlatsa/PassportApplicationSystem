@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { format } from 'date-fns';
 import { sendNotificationEmail } from '../lib/notifications';
 import type { Database } from '../lib/supabase';
+import { DocumentPreview } from '../components/DocumentViewer';
 
 type Application = Database['public']['Tables']['passport_applications']['Row'] & {
   collection_point_name?: string;
@@ -723,6 +724,33 @@ export default function OfficialDashboard() {
                   </p>
                 </div>
               )}
+
+              {/* Documents Section */}
+              <div className="mt-6 border-t pt-6">
+                <h4 className="text-lg font-medium text-gray-900 mb-4">Uploaded Documents</h4>
+                <DocumentPreview documents={[
+                  selectedApplication.id_document_url ? {
+                    name: 'ID Document',
+                    url: selectedApplication.id_document_url
+                  } : null,
+                  selectedApplication.birth_certificate_url ? {
+                    name: 'Birth Certificate',
+                    url: selectedApplication.birth_certificate_url
+                  } : null,
+                  selectedApplication.proof_of_address_url ? {
+                    name: 'Proof of Address',
+                    url: selectedApplication.proof_of_address_url
+                  } : null,
+                  selectedApplication.proof_of_payment_url ? {
+                    name: 'Proof of Payment',
+                    url: selectedApplication.proof_of_payment_url
+                  } : null,
+                  selectedApplication.passport_photo_url ? {
+                    name: 'Passport Photo',
+                    url: selectedApplication.passport_photo_url
+                  } : null
+                ].filter(Boolean) as Array<{name: string; url: string}>} />
+              </div>
 
               <div className="mt-6 border-t pt-6">
                 <button

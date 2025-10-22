@@ -18,6 +18,7 @@ export type Database = {
           date_of_birth: string;
           place_of_birth: string;
           nationality: string;
+          id_number: string;
           email: string;
           phone: string;
           address: string;
@@ -68,7 +69,7 @@ export type Database = {
           application_id: string;
           type: 'sms' | 'email';
           recipient: string;
-        proof_of_payment_url: string | null;
+          proof_of_payment_url: string | null;
           message: string;
           status: 'sent' | 'failed' | 'pending';
           sent_at: string | null;
@@ -76,6 +77,17 @@ export type Database = {
         };
         Insert: Omit<Database['public']['Tables']['notification_logs']['Row'], 'id' | 'created_at'>;
         Update: Partial<Database['public']['Tables']['notification_logs']['Insert']>;
+      };
+      basotho: {
+        Row: {
+          id: string;
+          idnumber: string;
+          name: string;
+          surname: string;
+          created_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['basotho']['Row'], 'id' | 'created_at'>;
+        Update: Partial<Database['public']['Tables']['basotho']['Insert']>;
       };
     };
   };

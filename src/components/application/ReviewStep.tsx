@@ -3,7 +3,7 @@ import { ChevronLeft, Check, FileText, AlertCircle } from 'lucide-react';
 import type { ApplicationFormData } from '../../pages/Apply';
 import { format } from 'date-fns';
 import { supabase } from '../../lib/supabase';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 interface ReviewStepProps {
   formData: ApplicationFormData & { collectionPointId?: string };
@@ -15,23 +15,29 @@ interface ReviewStepProps {
 }
 
 export default function ReviewStep({ formData, onPrev, onSubmit, isSubmitting }: ReviewStepProps) {
-  const [collectionPoint, setCollectionPoint] = useState<any>(null);
+  const [collectionPoint, setCollectionPoint] = useState<{
+    id: string;
+    name: string;
+    address: string;
+    district: string;
+    contact_phone: string;
+  } | null>(null);
 
-  useEffect(() => {
-    if (formData.collectionPointId) {
-      fetchCollectionPoint();
-    }
-  }, [formData.collectionPointId]);
-
-  const fetchCollectionPoint = async () => {
+  const fetchCollectionPoint = useCallback(async () => {
     const { data } = await supabase
       .from('collection_points')
       .select('*')
       .eq('id', formData.collectionPointId)
       .single();
-    
+
     setCollectionPoint(data);
-  };
+  }, [formData.collectionPointId]);
+
+  useEffect(() => {
+    if (formData.collectionPointId) {
+      fetchCollectionPoint();
+    }
+  }, [formData.collectionPointId, fetchCollectionPoint]);
 
   const personalInfo = [
     { label: 'First Name', value: formData.firstName },
@@ -39,6 +45,7 @@ export default function ReviewStep({ formData, onPrev, onSubmit, isSubmitting }:
     { label: 'Date of Birth', value: formData.dateOfBirth ? format(new Date(formData.dateOfBirth), 'MMMM dd, yyyy') : '' },
     { label: 'Place of Birth', value: formData.placeOfBirth },
     { label: 'Nationality', value: formData.nationality },
+    { label: 'ID Number', value: formData.idNumber },
     { label: 'Email', value: formData.email },
     { label: 'Phone', value: formData.phone },
     { label: 'Address', value: formData.address }
