@@ -8,6 +8,7 @@ import PaymentStep from '../components/application/PaymentStep';
 import ReviewStep from '../components/application/ReviewStep';
 import { useAuth } from '../contexts/AuthContext';
 import { useApplications } from '../contexts/ApplicationContext';
+import { FileUploadService } from '../lib/fileUpload';
 
 export interface ApplicationFormData {
   firstName: string;
@@ -15,6 +16,7 @@ export interface ApplicationFormData {
   dateOfBirth: string;
   placeOfBirth: string;
   nationality: string;
+  idNumber: string;
   email: string;
   phone: string;
   address: string;
@@ -40,6 +42,7 @@ export default function Apply() {
     dateOfBirth: '',
     placeOfBirth: '',
     nationality: 'Lesotho',
+    idNumber: '',
     email: user?.email || '',
     phone: '',
     address: '',
@@ -73,18 +76,33 @@ export default function Apply() {
 
   const submitApplication = async () => {
     setIsSubmitting(true);
-    
+
     try {
       // Generate reference number
       const refNumber = `LSO${Date.now().toString().slice(-8)}`;
-      
+
       // Validate required fields
-      if (!formData.firstName || !formData.lastName || !formData.address || !formData.email || !formData.phone || !formData.collectionPointId) {
-        throw new Error('Please fill in all required fields: name, address, email, phone, and collection point');
+      if (!formData.firstName || !formData.lastName || !formData.address || !formData.email || !formData.phone || !formData.collectionPointId || !formData.idNumber) {
+        throw new Error('Please fill in all required fields: name, address, email, phone, ID number, and collection point');
       }
 
-      // In a real app, you would upload files to Supabase Storage here
-      // For now, we'll use placeholder URLs
+      // Validate ID number format (LS followed by 12 digits)
+      const idRegex = /^LS\d{12}$/;
+      if (!idRegex.test(formData.idNumber)) {
+        throw new Error('ID number must start with "LS" followed by exactly 12 digits (e.g., LS123456789012)');
+      }
+
+      // Upload files to Supabase Storage
+      console.log('Uploading files to storage...');
+      const uploadedFiles = await FileUploadService.uploadApplicationFiles(refNumber, {
+        idDocument: formData.idDocument || undefined,
+        birthCertificate: formData.birthCertificate || undefined,
+        proofOfAddress: formData.proofOfAddress || undefined,
+        proofOfPayment: formData.proofOfPayment || undefined,
+      });
+
+      console.log('Files uploaded successfully:', uploadedFiles);
+
       const applicationData = {
         user_id: user!.id,
         reference_number: refNumber,
@@ -93,15 +111,16 @@ export default function Apply() {
         date_of_birth: formData.dateOfBirth,
         place_of_birth: formData.placeOfBirth,
         nationality: formData.nationality,
+        id_number: formData.idNumber,
         email: formData.email,
         phone: formData.phone,
         address: formData.address,
         emergency_contact_name: formData.emergencyContactName,
         emergency_contact_phone: formData.emergencyContactPhone,
-        id_document_url: formData.idDocument ? 'uploaded' : null,
-        birth_certificate_url: formData.birthCertificate ? 'uploaded' : null,
-        proof_of_address_url: formData.proofOfAddress ? 'uploaded' : null,
-        proof_of_payment_url: formData.proofOfPayment ? 'uploaded' : null,
+        id_document_url: uploadedFiles.id_document_url || null,
+        birth_certificate_url: uploadedFiles.birth_certificate_url || null,
+        proof_of_address_url: uploadedFiles.proof_of_address_url || null,
+        proof_of_payment_url: uploadedFiles.proof_of_payment_url || null,
         collection_point_id: formData.collectionPointId,
         status: 'submitted' as const,
         qr_code: null,

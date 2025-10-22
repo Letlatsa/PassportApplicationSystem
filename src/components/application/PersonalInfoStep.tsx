@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Loader2 } from 'lucide-react';
 import type { ApplicationFormData } from '../../pages/Apply';
+import { supabase } from '../../lib/supabase';
 
 interface PersonalInfoStepProps {
   formData: ApplicationFormData;
@@ -11,7 +12,9 @@ interface PersonalInfoStepProps {
   isLast?: boolean;
 }
 
-export default function PersonalInfoStep({ formData, updateFormData, onNext, isFirst }: PersonalInfoStepProps) {
+export default function PersonalInfoStep({ formData, updateFormData, onNext }: PersonalInfoStepProps) {
+  const [isValidating, setIsValidating] = useState(false);
+
   const {
     register,
     handleSubmit,
@@ -23,6 +26,7 @@ export default function PersonalInfoStep({ formData, updateFormData, onNext, isF
       dateOfBirth: formData.dateOfBirth,
       placeOfBirth: formData.placeOfBirth,
       nationality: formData.nationality,
+      idNumber: formData.idNumber,
       email: formData.email,
       phone: formData.phone,
       address: formData.address,
@@ -31,12 +35,87 @@ export default function PersonalInfoStep({ formData, updateFormData, onNext, isF
     }
   });
 
-  const onSubmit = (data: any) => {
-    updateFormData({
-      ...formData,
-      ...data
-    });
-    onNext();
+
+  const validateCitizenData = async (idNumber: string, firstName: string, lastName: string): Promise<string | null> => {
+    try {
+      // 1. Check ID format validity
+      const idRegex = /^LS\d{12}$/;
+      if (!idRegex.test(idNumber)) {
+        return 'ID, Names or other details are invalid. Please check information entered and try again.';
+      }
+
+      // 2. Check if ID exists in Basotho table and validate names
+      const { data: basotho, error } = await supabase
+        .from('basotho')
+        .select('idnumber, name, surname')
+        .eq('idnumber', idNumber);
+
+      console.log('Basotho query result:', { data: basotho, error, idNumber });
+
+      if (error || !basotho || basotho.length === 0) {
+        console.log('No Basotho found with ID:', idNumber);
+        return 'ID, Names or other details are invalid. Please check information entered and try again.';
+      }
+
+      const basothoRecord = basotho[0];
+
+      // 3. Compare names
+      const formFirstName = firstName.trim().toLowerCase();
+      const formLastName = lastName.trim().toLowerCase();
+      const dbFirstName = basothoRecord.name.toLowerCase();
+      const dbLastName = basothoRecord.surname.toLowerCase();
+
+      console.log('Name comparison:', {
+        formFirstName,
+        formLastName,
+        dbFirstName,
+        dbLastName
+      });
+
+      // Check if names match
+      const firstNameMatch = formFirstName === dbFirstName;
+      const lastNameMatch = formLastName === dbLastName;
+
+      if (!firstNameMatch || !lastNameMatch) {
+        console.log('Name mismatch detected');
+        return 'ID, Names or other details are invalid. Please check information entered and try again.';
+      }
+
+      console.log('Validation passed');
+      return null; // Validation passed
+    } catch (error) {
+      console.error('Error validating Basotho data:', error);
+      return 'ID, Names or other details are invalid. Please check information entered and try again.';
+    }
+  };
+
+  const onSubmit = async (data: Partial<ApplicationFormData>) => {
+    setIsValidating(true);
+
+    try {
+      const validationError = await validateCitizenData(
+        data.idNumber || '',
+        data.firstName || '',
+        data.lastName || ''
+      );
+
+      if (validationError) {
+        alert(validationError);
+        setIsValidating(false);
+        return;
+      }
+
+      updateFormData({
+        ...formData,
+        ...data
+      });
+      onNext();
+    } catch (error) {
+      console.error('Validation error:', error);
+      alert('An error occurred during validation. Please try again.');
+    } finally {
+      setIsValidating(false);
+    }
   };
 
   return (
@@ -50,6 +129,28 @@ export default function PersonalInfoStep({ formData, updateFormData, onNext, isF
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label htmlFor="idNumber" className="block text-sm font-medium text-gray-700 mb-1">
+              National ID Number *
+            </label>
+            <input
+              {...register('idNumber', {
+                required: 'ID number is required',
+                pattern: {
+                  value: /^LS\d{12}$/,
+                  message: 'ID number must start with "LS" followed by exactly 12 digits'
+                }
+              })}
+              type="text"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="National ID Number"
+              maxLength={14}
+            />
+            {errors.idNumber && (
+              <p className="text-red-500 text-xs mt-1">{errors.idNumber.message}</p>
+            )}
+          </div>
+
           <div>
             <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">
               First Name *
@@ -125,6 +226,7 @@ export default function PersonalInfoStep({ formData, updateFormData, onNext, isF
               <p className="text-red-500 text-xs mt-1">{errors.nationality.message}</p>
             )}
           </div>
+
 
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
@@ -216,10 +318,20 @@ export default function PersonalInfoStep({ formData, updateFormData, onNext, isF
         <div className="flex justify-end">
           <button
             type="submit"
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center"
+            disabled={isValidating}
+            className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center"
           >
-            Next Step
-            <ChevronRight className="w-4 h-4 ml-2" />
+            {isValidating ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Validating...
+              </>
+            ) : (
+              <>
+                Next Step
+                <ChevronRight className="w-4 h-4 ml-2" />
+              </>
+            )}
           </button>
         </div>
       </form>
