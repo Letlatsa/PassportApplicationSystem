@@ -54,16 +54,38 @@ export default function Navbar() {
                   </Link>
                 )}
                 {isStaff && (
-                  <Link
-                    to="/official"
-                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      isActive('/official')
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'text-gray-700 hover:text-blue-600'
-                    }`}
-                  >
-                    Official Dashboard
-                  </Link>
+                  <>
+                    <Link
+                      to="/official"
+                      className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                        isActive('/official')
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'text-gray-700 hover:text-blue-600'
+                      }`}
+                    >
+                      Official Dashboard
+                    </Link>
+                    <Link
+                      to="/profile"
+                      className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                        isActive('/profile')
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'text-gray-700 hover:text-blue-600'
+                      }`}
+                    >
+                      Profile
+                    </Link>
+                    <Link
+                      to="/collection-points"
+                      className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                        isActive('/collection-points')
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'text-gray-700 hover:text-blue-600'
+                      }`}
+                    >
+                      Collection Points
+                    </Link>
+                  </>
                 )}
                 {!isStaff && (
                   <>
@@ -178,17 +200,41 @@ export default function Navbar() {
                   </Link>
                 )}
                 {isStaff && (
-                  <Link
-                    to="/official"
-                    className={`block px-3 py-2 rounded-md text-base font-medium ${
-                      isActive('/official')
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'text-gray-700 hover:text-blue-600'
-                    }`}
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    Official Dashboard
-                  </Link>
+                  <>
+                    <Link
+                      to="/official"
+                      className={`block px-3 py-2 rounded-md text-base font-medium ${
+                        isActive('/official')
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'text-gray-700 hover:text-blue-600'
+                      }`}
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      Official Dashboard
+                    </Link>
+                    <Link
+                      to="/profile"
+                      className={`block px-3 py-2 rounded-md text-base font-medium ${
+                        isActive('/profile')
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'text-gray-700 hover:text-blue-600'
+                      }`}
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      Profile
+                    </Link>
+                    <Link
+                      to="/collection-points"
+                      className={`block px-3 py-2 rounded-md text-base font-medium ${
+                        isActive('/collection-points')
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'text-gray-700 hover:text-blue-600'
+                      }`}
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      Collection Points
+                    </Link>
+                  </>
                 )}
                 {!isStaff && (
                   <>

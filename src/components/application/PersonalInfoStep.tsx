@@ -8,11 +8,12 @@ interface PersonalInfoStepProps {
   formData: ApplicationFormData;
   updateFormData: (data: ApplicationFormData) => void;
   onNext: () => void;
+  onValidationError?: (error: string) => void;
   isFirst: boolean;
   isLast?: boolean;
 }
 
-export default function PersonalInfoStep({ formData, updateFormData, onNext }: PersonalInfoStepProps) {
+export default function PersonalInfoStep({ formData, updateFormData, onNext, onValidationError }: PersonalInfoStepProps) {
   const [isValidating, setIsValidating] = useState(false);
 
   const {
@@ -100,7 +101,11 @@ export default function PersonalInfoStep({ formData, updateFormData, onNext }: P
       );
 
       if (validationError) {
-        alert(validationError);
+        if (onValidationError) {
+          onValidationError(validationError);
+        } else {
+          alert(validationError);
+        }
         setIsValidating(false);
         return;
       }
