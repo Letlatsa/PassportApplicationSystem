@@ -33,9 +33,11 @@ export default function Apply() {
   const { user } = useAuth();
   const { createApplication } = useApplications();
   const navigate = useNavigate();
-  
+
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [formData, setFormData] = useState<ApplicationFormData>({
     firstName: '',
     lastName: '',
@@ -59,7 +61,7 @@ export default function Apply() {
     { number: 2, title: 'Collection Point', component: CollectionPointStep },
     { number: 3, title: 'Documents', component: DocumentsStep },
     { number: 4, title: 'Payment', component: PaymentStep },
-    { number: 5, title: 'Review & Submit', component: ReviewStep }
+    { number: 5, title: 'Review', component: ReviewStep }
   ];
 
   const nextStep = () => {
@@ -79,7 +81,7 @@ export default function Apply() {
 
     try {
       // Generate reference number
-      const refNumber = `LSO${Date.now().toString().slice(-8)}`;
+      const refNumber = `LSP${Date.now().toString().slice(-8)}`;
 
       // Validate required fields
       if (!formData.firstName || !formData.lastName || !formData.address || !formData.email || !formData.phone || !formData.collectionPointId || !formData.idNumber) {
@@ -89,7 +91,7 @@ export default function Apply() {
       // Validate ID number format (LS followed by 12 digits)
       const idRegex = /^LS\d{12}$/;
       if (!idRegex.test(formData.idNumber)) {
-        throw new Error('ID number must start with "LS" followed by exactly 12 digits (e.g., LS123456789012)');
+        throw new Error('ID number entered is invalid. Please make sure it has minimum 12 digits and starts with "LS".');
       }
 
       // Upload files to Supabase Storage
@@ -214,17 +216,59 @@ export default function Apply() {
 
       {/* Current Step */}
       <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-4 sm:p-6 mb-6 sm:mb-8">
-        <CurrentStepComponent
-          formData={formData}
-          updateFormData={setFormData}
-          onNext={nextStep}
-          onPrev={prevStep}
-          onSubmit={submitApplication}
-          isFirst={currentStep === 1}
-          isLast={currentStep === steps.length}
-          isSubmitting={isSubmitting}
-        />
+        {currentStep === 1 ? (
+          <PersonalInfoStep
+            formData={formData}
+            updateFormData={setFormData}
+            onNext={nextStep}
+            onValidationError={(error) => {
+              setErrorMessage(error);
+              setShowErrorModal(true);
+            }}
+            isFirst={true}
+          />
+        ) : (
+          <CurrentStepComponent
+            formData={formData}
+            updateFormData={setFormData}
+            onNext={nextStep}
+            onPrev={prevStep}
+            onSubmit={submitApplication}
+            isFirst={false}
+            isLast={currentStep === steps.length}
+            isSubmitting={isSubmitting}
+          />
+        )}
       </div>
+      {/* Error Modal */}
+      {showErrorModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-red-600">Validation Error</h3>
+              <button
+                onClick={() => setShowErrorModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="mb-6">
+              <p className="text-gray-700">{errorMessage}</p>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShowErrorModal(false)}
+                className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );
