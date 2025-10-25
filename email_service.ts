@@ -29,29 +29,52 @@ serve(async (req: Request) => {
       throw new Error('SendGrid API key is not configured');
     }
 
-    const { recipient_email, status, name, reference_number, appointment_date, appointment_time } = await req.json();
+    const { recipient_email, status, name, reference_number, appointment_date, appointment_time, otp_code } = await req.json();
     console.log('Sending email to:', recipient_email);
 
-    if (!recipient_email || !status || !name || !reference_number) {
-      throw new Error('Missing required fields');
+    if (!recipient_email) {
+      throw new Error('Missing recipient email');
     }
 
-    const statusMessages: Record<string, string> = {
-      submitted: `Dear ${name},<br><br>Your passport application (Ref: ${reference_number}) has been successfully submitted. You will be notified once it is reviewed and approved.`,
-      under_review: `Dear ${name},<br><br>Your passport application (Ref: ${reference_number}) is currently under review by our team.`,
-      approved: `Dear ${name},<br><br>Great news! Your passport application (Ref: ${reference_number}) has been approved. Please schedule an appointment to visit our offices for biometrics.`,
-      appointment_booked: `Dear ${name},<br><br>Your biometrics appointment has been successfully booked!<br><br><strong>Appointment Details:</strong><br>Date: ${appointment_date || 'N/A'}<br>Time: ${appointment_time || 'N/A'}<br>Reference: ${reference_number}<br><br>Please arrive 10 minutes early and bring a valid ID document.`,
-      ready_for_collection: `Dear ${name},<br><br>Your passport (Ref: ${reference_number}) is ready for collection. Please visit your selected collection point with a valid ID.`,
-      collected: `Dear ${name},<br><br>Your passport (Ref: ${reference_number}) has been successfully collected. Thank you for using our service.`,
-      rejected: `Dear ${name},<br><br>Unfortunately, your passport application (Ref: ${reference_number}) has been rejected. Log in and reapply or contact our office for more details.`,
-    };
+    // For password reset, we don't need name and reference_number
+    if (status !== 'password_reset_otp' && !status) {
+      throw new Error('Missing status field');
+    }
 
-    const message = statusMessages[status] || `Dear ${name},<br><br>Your application status for Ref: ${reference_number} has been updated.`;
-    
-    // Dynamic subject line based on status
-    const emailSubject = status === 'appointment_booked' 
-      ? `Biometrics Appointment Confirmed - Ref: ${reference_number}`
-      : `Passport Application Update - Ref: ${reference_number}`;
+    let message: string;
+    let emailSubject: string;
+
+    if (status === 'password_reset_otp') {
+      // Handle password reset OTP
+      if (!otp_code) {
+        throw new Error('OTP code is required for password reset');
+      }
+      message = `Dear User,<br><br>You have requested to reset your password. Your verification code is:<br><br><strong style="font-size: 24px; color: #2563eb;">${otp_code}</strong><br><br>This code will expire in 10 minutes. If you did not request this reset, please ignore this email.`;
+      emailSubject = 'Password Reset Verification Code';
+    } else {
+      // Handle application status updates
+      if (!status || !name || !reference_number) {
+        throw new Error('Missing required fields for application status update');
+      }
+
+      const statusMessages: Record<string, string> = {
+        submitted: `Dear ${name},<br><br>Your passport application (Ref: ${reference_number}) has been successfully submitted. You will be notified once it is reviewed and approved.`,
+        approved: `Dear ${name},<br><br>Great news! Your passport application (Ref: ${reference_number}) has been approved. Please schedule an appointment to visit our offices for biometrics.`,
+        appointment_booked: `Dear ${name},<br><br>Your biometrics appointment has been successfully booked!<br><br><strong>Appointment Details:</strong><br>Date: ${appointment_date || 'N/A'}<br>Time: ${appointment_time || 'N/A'}<br>Reference: ${reference_number}<br><br>Please arrive 10 minutes early and bring a valid ID document.`,
+        await_printing: `Dear ${name},<br><br>Your passport application (Ref: ${reference_number}) has been processed and is now awaiting printing. You will be notified once your passport is ready for collection.`,
+        ready_for_collection: `Dear ${name},<br><br>Your passport (Ref: ${reference_number}) is ready for collection. Please visit your selected collection point with a valid ID.`,
+        collected: `Dear ${name},<br><br>Your passport (Ref: ${reference_number}) has been successfully collected. Thank you for using our service.`,
+        rejected: `Dear ${name},<br><br>Unfortunately, your passport application (Ref: ${reference_number}) has been rejected. Log in and reapply or contact our office for more details.`,
+      };
+
+      message = statusMessages[status] || `Dear ${name},<br><br>Your application status for Ref: ${reference_number} has been updated.`;
+
+      // Dynamic subject line based on status
+      emailSubject = status === 'appointment_booked'
+        ? `Biometrics Appointment Confirmed - Ref: ${reference_number}`
+        : `Passport Application Update - Ref: ${reference_number}`;
+    }
+
 
     console.log('Calling SendGrid API...');
 
@@ -64,7 +87,7 @@ serve(async (req: Request) => {
       },
       body: JSON.stringify({
         personalizations: [{
-          to: [{ email: recipient_email, name: name }],
+          to: [{ email: recipient_email, name: name || 'User' }],
           subject: emailSubject
         }],
         from: {
@@ -116,16 +139,14 @@ serve(async (req: Request) => {
             </head>
             <body>
                 <div class="header">
-                    <h2>Passport Application Status Update</h2>
+                    <h2>${status === 'password_reset_otp' ? 'Password Reset Verification' : 'Passport Application Status Update'}</h2>
                 </div>
-                
+
                 <div class="content">
                     ${message}
                 </div>
-                
-                <div class="reference">
-                    Reference Number: ${reference_number}
-                </div>
+
+                ${status !== 'password_reset_otp' ? `<div class="reference">Reference Number: ${reference_number}</div>` : ''}
                 
                 <div class="footer">
                     This is an automated message from Passport Office. Please do not reply to this email.

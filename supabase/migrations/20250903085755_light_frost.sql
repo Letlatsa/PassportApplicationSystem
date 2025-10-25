@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS passport_applications (
   id_document_url text,
   birth_certificate_url text,
   proof_of_address_url text,
-  status text DEFAULT 'submitted' CHECK (status IN ('submitted', 'under_review', 'approved', 'ready_for_collection', 'collected', 'rejected')),
+  status text DEFAULT 'submitted' CHECK (status IN ('submitted', 'approved', 'appointment_booked', 'await_printing', 'ready_for_collection', 'collected', 'rejected')),
   collection_point_id uuid,
   qr_code text,
   created_at timestamptz DEFAULT now(),

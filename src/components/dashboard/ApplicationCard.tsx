@@ -12,8 +12,9 @@ interface ApplicationCardProps {
 
 const statusColors = {
   submitted: 'bg-blue-100 text-blue-800',
-  under_review: 'bg-yellow-100 text-yellow-800',
   approved: 'bg-green-100 text-green-800',
+  appointment_booked: 'bg-indigo-100 text-indigo-800',
+  await_printing: 'bg-orange-100 text-orange-800',
   ready_for_collection: 'bg-purple-100 text-purple-800',
   collected: 'bg-emerald-100 text-emerald-800',
   rejected: 'bg-red-100 text-red-800'
@@ -21,8 +22,9 @@ const statusColors = {
 
 const statusLabels = {
   submitted: 'Submitted',
-  under_review: 'Under Review',
   approved: 'Approved',
+  appointment_booked: 'Appointment Booked',
+  await_printing: 'Await Printing',
   ready_for_collection: 'Ready for Collection',
   collected: 'Collected',
   rejected: 'Rejected'
@@ -32,6 +34,7 @@ export default function ApplicationCard({ application }: ApplicationCardProps) {
   const [showRejectionModal, setShowRejectionModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState<string | null>(null);
   const [loadingReason, setLoadingReason] = useState(false);
+  const [lastStatusUpdate, setLastStatusUpdate] = useState<string | null>(null);
 
   const showQRCode = () => {
     if (application.qr_code) {
@@ -68,11 +71,34 @@ export default function ApplicationCard({ application }: ApplicationCardProps) {
     }
   };
 
+  const fetchLastStatusUpdate = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('application_status_updates')
+        .select('created_at')
+        .eq('application_id', application.id)
+        .eq('status', application.status)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) {
+        console.error('Error fetching last status update:', error);
+        setLastStatusUpdate(null);
+      } else {
+        setLastStatusUpdate(data && data.length > 0 ? data[0].created_at : null);
+      }
+    } catch (error) {
+      console.error('Error fetching last status update:', error);
+      setLastStatusUpdate(null);
+    }
+  };
+
   useEffect(() => {
     if (showRejectionModal) {
       fetchRejectionReason();
     }
-  }, [showRejectionModal]);
+    fetchLastStatusUpdate();
+  }, [showRejectionModal, application.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <>
@@ -88,9 +114,16 @@ export default function ApplicationCard({ application }: ApplicationCardProps) {
           </div>
           
           <div className="flex items-center space-x-4 mt-4 lg:mt-0">
-            <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[application.status]}`}>
-              {statusLabels[application.status]}
-            </span>
+            <div className="flex flex-col items-end">
+              <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[application.status]}`}>
+                {statusLabels[application.status]}
+              </span>
+              {lastStatusUpdate && (
+                <span className="text-xs text-gray-500 mt-1">
+                  Updated: {format(new Date(lastStatusUpdate), 'MMM dd, yyyy HH:mm')}
+                </span>
+              )}
+            </div>
             {application.status === 'rejected' && (
               <button
                 onClick={() => setShowRejectionModal(true)}

@@ -1,11 +1,13 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useApplications } from '../contexts/ApplicationContext';
-import { UserCircle, Mail, Phone, MapPin, FileText, Shield, Briefcase } from 'lucide-react';
+import { UserCircle, Mail, Phone, MapPin, FileText, Shield, Briefcase, Lock } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export default function Profile() {
-  const { user, userProfile, isAdmin, isStaff } = useAuth();
-  const { applications, loading } = useApplications();
+   const { user, userProfile, isAdmin, isStaff } = useAuth();
+   const { applications, loading } = useApplications();
+   const navigate = useNavigate();
 
   // Assuming the most recent application is the most relevant
   const latestApplication = applications?.[0];
@@ -97,6 +99,26 @@ export default function Profile() {
               </>
             )}
           </dl>
+        </div>
+
+        {/* Password Reset Section */}
+        <div className="border-t border-gray-200 bg-gray-50/50 px-8 py-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 flex items-center">
+                <Lock className="w-5 h-5 mr-2 text-gray-600" />
+                Password & Security
+              </h3>
+              <p className="text-sm text-gray-600 mt-1">Update your password to keep your account secure</p>
+            </div>
+            <button
+              onClick={() => navigate('/reset-password')}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center"
+            >
+              <Lock className="w-4 h-4 mr-2" />
+              Change Password
+            </button>
+          </div>
         </div>
       </div>
     </div>

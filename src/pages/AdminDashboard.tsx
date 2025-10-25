@@ -641,8 +641,9 @@ export default function AdminDashboard() {
                 >
                   <option value="all">All Statuses</option>
                   <option value="submitted">Submitted</option>
-                  <option value="under_review">Under Review</option>
                   <option value="approved">Approved</option>
+                  <option value="appointment_booked">Appointment Booked</option>
+                  <option value="await_printing">Await Printing</option>
                   <option value="ready_for_collection">Ready for Collection</option>
                   <option value="collected">Collected</option>
                   <option value="rejected">Rejected</option>
@@ -727,12 +728,24 @@ export default function AdminDashboard() {
                               className="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             >
                               <option value="submitted">Submitted</option>
-                              <option value="under_review">Under Review</option>
                               <option value="approved">Approved</option>
+                              <option value="appointment_booked">Appointment Booked</option>
+                              <option value="await_printing">Await Printing</option>
                               <option value="ready_for_collection">Ready for Collection</option>
                               <option value="collected">Collected</option>
                               <option value="rejected">Rejected</option>
                             </select>
+                            {application.status === 'appointment_booked' && (
+                              <button
+                                onClick={() => {
+                                  setSelectedApplication(application);
+                                  setShowBiometricsModal(true);
+                                }}
+                                className="text-purple-600 hover:text-purple-800 text-xs font-medium ml-2"
+                              >
+                                Biometrics
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -990,6 +1003,17 @@ export default function AdminDashboard() {
                 >
                   Reject Application
                 </button>
+                {appointments.some(apt => apt.application_id === selectedApplication.id) && selectedApplication.status === 'appointment_booked' && (
+                  <button
+                    onClick={() => {
+                      setShowApplicationModal(false);
+                      setShowBiometricsModal(true);
+                    }}
+                    className="w-full bg-purple-600 text-white px-4 py-2 rounded-lg shadow hover:bg-purple-700 transition-all mt-2"
+                  >
+                    Capture Biometrics
+                  </button>
+                )}
                 <button
                   onClick={() => setShowApplicationModal(false)}
                   className="w-full bg-gray-300 text-gray-700 px-4 py-2 rounded-lg shadow hover:bg-gray-400 transition-all mt-2"
