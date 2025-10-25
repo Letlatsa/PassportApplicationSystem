@@ -8,6 +8,7 @@ interface StatusUpdate {
   status: string;
   notes: string | null;
   created_at: string;
+  updated_by?: string;
 }
 
 interface StatusTimelineProps {
@@ -17,16 +18,18 @@ interface StatusTimelineProps {
 
 const statusSteps = [
   { key: 'submitted', label: 'Submitted', icon: FileCheck },
-  { key: 'under_review', label: 'Under Review', icon: Clock },
   { key: 'approved', label: 'Approved', icon: CheckCircle },
+  { key: 'appointment_booked', label: 'Appointment Booked', icon: Clock },
+  { key: 'await_printing', label: 'Await Printing', icon: Clock },
   { key: 'ready_for_collection', label: 'Ready for Collection', icon: Package },
   { key: 'collected', label: 'Collected', icon: CheckCircle }
 ];
 
 const STATUS_LABELS: Record<string, string> = {
   submitted: 'Application submitted',
-  under_review: 'Application under review',
   approved: 'Application approved',
+  appointment_booked: 'Appointment booked',
+  await_printing: 'Await printing',
   ready_for_collection: 'Ready for collection',
   collected: 'Collected',
   rejected: 'Application rejected',
@@ -153,9 +156,11 @@ export default function StatusTimeline({ applicationId, currentStatus }: StatusT
                       {step.label}
                     </h5>
                     {update && (
-                      <span className="text-xs text-gray-500">
-                        {format(new Date(update.created_at), 'MMM dd, HH:mm')}
-                      </span>
+                      <div className="text-right">
+                        <div className="text-xs text-gray-500">
+                          {format(new Date(update.created_at), 'MMM dd, HH:mm')}
+                        </div>
+                      </div>
                     )}
                   </div>
                   {update?.notes && (

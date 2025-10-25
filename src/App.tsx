@@ -14,6 +14,9 @@ import OfficialDashboard from './pages/OfficialDashboard';
 import OfficerRegister from './pages/OfficerRegister';
 import CollectionInterface from './pages/CollectionInterface';
 import Profile from './pages/Profile';
+import ForgotPassword from './pages/ForgotPassword';
+import VerifyOTP from './pages/VerifyOTP';
+import ResetPassword from './pages/ResetPassword';
 
 function ProtectedRoute({ children, allowedRoles = [] }: { children: React.ReactNode; allowedRoles?: string[] }) {
   const { user, loading, isAdmin, isStaff } = useAuth();
@@ -93,6 +96,9 @@ function App() {
                 <Route path="/official" element={<ProtectedRoute allowedRoles={['staff']}><OfficialDashboard /></ProtectedRoute>} />
                 <Route path="/officerRegister" element={<ProtectedRoute><OfficerRegister /></ProtectedRoute>} />
                 <Route path="/collection-interface" element={<CollectionInterface />} />
+                <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
+                <Route path="/verify-otp" element={<PublicRoute><VerifyOTP /></PublicRoute>} />
+                <Route path="/reset-password" element={<ResetPassword />} />
               </Routes>
             </main>
           </div>

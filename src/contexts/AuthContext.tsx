@@ -35,17 +35,22 @@ interface AuthContextType {
   isAdmin: boolean;
   isStaff: boolean;
   userProfile: UserProfile | null;
+  requestPasswordReset: (email: string) => Promise<{ error: AuthError | null }>;
+  verifyOTP: (email: string, otp: string) => Promise<{ error: AuthError | null }>;
+  resetPassword: (newPassword: string) => Promise<{ error: AuthError | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function useAuth() {
+const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-}
+};
+
+export { useAuth };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -192,15 +197,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('Auth state changed:', event);
         const currentUser = session?.user || null;
         setUser(currentUser);
-        
-        if (currentUser) {
+
+        // Only fetch profile for SIGNED_IN events, not USER_UPDATED
+        if (event === 'SIGNED_IN' && currentUser) {
           await fetchUserProfile(currentUser.id, currentUser.email);
-        } else {
+        } else if (!currentUser) {
           setUserProfile(null);
           setIsAdmin(false);
           setIsStaff(false);
         }
-        
+
         setLoading(false);
       }
     );
@@ -209,15 +215,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const signIn = async (email: string, password: string) => {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ 
-        email, 
-        password 
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password
       });
-      
+
       return { error };
     } catch (error) {
       console.error('Sign in error:', error);
@@ -285,6 +291,118 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const requestPasswordReset = async (email: string) => {
+    try {
+      // Generate 5-digit OTP
+      const otp = Math.floor(10000 + Math.random() * 90000).toString();
+
+      // Store OTP in database (you might want to create a password_reset_tokens table)
+      // For now, we'll use localStorage as a temporary solution
+      localStorage.setItem(`password_reset_${email}`, JSON.stringify({
+        otp,
+        expires: Date.now() + 10 * 60 * 1000 // 10 minutes
+      }));
+
+      // Send OTP via email
+      const { error } = await supabase.functions.invoke('email_service', {
+        body: {
+          recipient_email: email,
+          status: 'password_reset_otp',
+          otp_code: otp
+        }
+      });
+
+      return { error };
+    } catch (error) {
+      console.error('Password reset request error:', error);
+      return { error: error as AuthError };
+    }
+  };
+
+  const verifyOTP = async (email: string, otp: string) => {
+    try {
+      const storedData = localStorage.getItem(`password_reset_${email}`);
+
+      if (!storedData) {
+        return { error: { message: 'No password reset request found' } as AuthError };
+      }
+
+      const { otp: storedOTP, expires } = JSON.parse(storedData);
+
+      if (Date.now() > expires) {
+        localStorage.removeItem(`password_reset_${email}`);
+        return { error: { message: 'OTP has expired' } as AuthError };
+      }
+
+      if (storedOTP !== otp) {
+        return { error: { message: 'Invalid OTP' } as AuthError };
+      }
+
+      // Mark OTP as verified
+      localStorage.setItem(`password_reset_verified_${email}`, 'true');
+
+      return { error: null };
+    } catch (error) {
+      console.error('OTP verification error:', error);
+      return { error: error as AuthError };
+    }
+  };
+
+  const resetPassword = async (newPassword?: string) => {
+    try {
+      // If newPassword is provided, this is a direct password update
+      if (newPassword) {
+        // Check if user is authenticated (has session)
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (session?.user) {
+          // Authenticated user - update password directly
+          const { error } = await supabase.auth.updateUser({
+            password: newPassword
+          });
+          return { error };
+        } else {
+          // No session - this might be from Supabase reset link
+          // Try to update anyway (Supabase handles the auth context)
+          const { error } = await supabase.auth.updateUser({
+            password: newPassword
+          });
+          return { error };
+        }
+      }
+
+      // Otherwise, this is for sending reset email (unauthenticated flow)
+      // Get the email from localStorage to identify which user to reset
+      const keys = Object.keys(localStorage);
+      const resetKey = keys.find(key => key.startsWith('password_reset_verified_'));
+      if (!resetKey) {
+        return { error: { message: 'No verified password reset session found' } as AuthError };
+      }
+
+      const email = resetKey.replace('password_reset_verified_', '');
+
+      // Since we can't update password without authentication, we'll use Supabase's built-in reset
+      // This will send an email with a reset link that the user can use
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (!error) {
+        // Clear any stored reset data
+        keys.forEach(key => {
+          if (key.startsWith('password_reset_')) {
+            localStorage.removeItem(key);
+          }
+        });
+      }
+
+      return { error };
+    } catch (error) {
+      console.error('Password reset error:', error);
+      return { error: error as AuthError };
+    }
+  };
+
   const value = {
     user,
     loading,
@@ -293,7 +411,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signOut,
     isAdmin,
     isStaff,
-    userProfile
+    userProfile,
+    requestPasswordReset,
+    verifyOTP,
+    resetPassword
   };
 
   return (

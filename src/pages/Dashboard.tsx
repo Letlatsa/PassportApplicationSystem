@@ -14,12 +14,6 @@ type BiometricsAppointment = Database['public']['Tables']['biometrics_appointmen
 export default function Dashboard() {
   const { user } = useAuth();
   const { applications, loading, refreshApplications } = useApplications();
-  const adminEmails = ['admin@lesotho.gov', 'admin@gov.ls'];
-  const isAdminUser = Boolean(
-    user &&
-    user.email &&
-    (adminEmails.includes(user.email) || user.email.includes('admin'))
-  );
   const [searchTerm, setSearchTerm] = useState('');
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
@@ -90,7 +84,7 @@ export default function Dashboard() {
     if (appointmentData.date) {
       const slots = getAvailableTimeSlots(appointmentData.date);
       setAvailableTimeSlots(slots);
-      
+
       // If current selected time is not available, clear it
       if (appointmentData.time && !slots.includes(appointmentData.time)) {
         setAppointmentData(prev => ({ ...prev, time: '' }));
@@ -98,7 +92,7 @@ export default function Dashboard() {
     } else {
       setAvailableTimeSlots(['09:00', '10:00', '11:00', '14:00', '15:00', '16:00']);
     }
-  }, [appointmentData.date, existingAppointments]);
+  }, [appointmentData.date, existingAppointments]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const hasActiveApplication = applications.some(app =>
     ['submitted', 'under_review', 'approved', 'appointment_booked'].includes(app.status)
@@ -313,6 +307,30 @@ export default function Dashboard() {
       }
     } catch (emailError) {
       console.error('Failed to send confirmation email:', emailError);
+    }
+
+    // Update application status to appointment_booked
+    const { error: statusError } = await supabase
+      .from('passport_applications')
+      .update({
+        status: 'appointment_booked',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', selectedApplication.id);
+
+    if (statusError) {
+      console.error('Error updating application status:', statusError);
+      // Don't fail the appointment booking if status update fails
+    } else {
+      // Log the status update
+      await supabase
+        .from('application_status_updates')
+        .insert([{
+          application_id: selectedApplication.id,
+          status: 'appointment_booked',
+          notes: `Appointment booked for ${appointmentData.date} at ${appointmentData.time}`,
+          updated_by: user?.id
+        }]);
     }
 
     alert(`✅ Appointment booked successfully!\n\nDate: ${appointmentData.date}\nTime: ${appointmentData.time}\n\nYou will receive a confirmation email shortly.`);
