@@ -61,8 +61,8 @@ export default function Dashboard() {
 
   // Function to get available time slots for selected date
   const getAvailableTimeSlots = (selectedDate: string) => {
-    const allTimeSlots = ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00'];
-    
+    const allTimeSlots = ['09:00','10:00','11:00','14:00','15:00','16:00'];
+
     if (!selectedDate) return allTimeSlots;
 
     // Get appointments for the selected date
@@ -75,7 +75,7 @@ export default function Dashboard() {
 
     // Filter out booked time slots
     const availableSlots = allTimeSlots.filter(slot => !bookedTimeSlots.includes(slot));
-    
+
     return availableSlots;
   };
 
@@ -90,7 +90,7 @@ export default function Dashboard() {
         setAppointmentData(prev => ({ ...prev, time: '' }));
       }
     } else {
-      setAvailableTimeSlots(['09:00', '10:00', '11:00', '14:00', '15:00', '16:00']);
+      setAvailableTimeSlots(['09:00','09:30','10:00','10:30','11:00','11:30','12:00','12:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30']);
     }
   }, [appointmentData.date, existingAppointments]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -131,7 +131,7 @@ export default function Dashboard() {
       date: '',
       time: ''
     }));
-    setAvailableTimeSlots(['09:00', '10:00', '11:00', '14:00', '15:00', '16:00']);
+    setAvailableTimeSlots(['09:00','10:00','11:00','14:00','15:00','16:00']);
   };
 
   // Function to handle date change with weekend validation
@@ -240,10 +240,8 @@ export default function Dashboard() {
         user_id: selectedApplication.user_id,
         reference_number: appointmentData.reference_number,
         date: appointmentData.date,
-        time: appointmentData.time,
-        created_at: new Date().toISOString()
-      }])
-      .select();
+        time: appointmentData.time
+      }]);
 
     if (insertError) {
       console.error('Insert error details:', insertError);

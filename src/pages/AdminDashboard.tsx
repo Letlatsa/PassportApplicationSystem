@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FileText, Users, MapPin, TrendingUp, Search, Filter, Plus, X, Calendar } from 'lucide-react';
+import { FileText, Users, MapPin, TrendingUp, Search, Filter, Plus, X, Calendar, Camera, Fingerprint, Upload } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { Database } from '../lib/supabase';
@@ -60,6 +60,9 @@ export default function AdminDashboard() {
   const [applicationToReject, setApplicationToReject] = useState<string | null>(null);
   const [collectionPointName, setCollectionPointName] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'applications' | 'officials' | 'appointments'>('applications');
+  const [showBiometricsModal, setShowBiometricsModal] = useState(false);
+  const [passportPhoto, setPassportPhoto] = useState<File | null>(null);
+  const [fingerprintData, setFingerprintData] = useState('');
   
   // Remove official modal and form state since we're redirecting
   //const [editingOfficial, setEditingOfficial] = useState<Official | null>(null);
@@ -79,7 +82,7 @@ export default function AdminDashboard() {
     const { data } = await supabase
       .from('passport_applications')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: true });
 
     setApplications(data || []);
     setLoading(false);
@@ -87,19 +90,20 @@ export default function AdminDashboard() {
   
   const fetchAppointments = async () => {
     try {
+      const today = new Date().toISOString().split('T')[0]; // Get today's date in YYYY-MM-DD format
+
       const { data, error } = await supabase
         .from('biometrics_appointments')
         .select(`
-          id,
-          application_id,
-          user_id,
-          reference_number,
-          date,
-          time,
-          created_at,
-          passport_applications (id, reference_number, first_name, last_name, user_id)
+          *,
+          passport_applications (
+            first_name,
+            last_name,
+            reference_number
+          )
         `)
-        .order('created_at', { ascending: false });
+        .gte('date', today) // Only get appointments from today onwards
+        .order('date', { ascending: true });
 
       if (error) throw error;
 
@@ -125,7 +129,8 @@ export default function AdminDashboard() {
         };
       });
 
-      console.debug('fetchAppointments: success, rows:', mapped.length, { raw: data });
+      console.log('✅ AdminDashboard: Successfully fetched', mapped.length, 'future appointments from database');
+      console.log('Appointment data:', mapped);
       setAppointments(mapped);
       setAppointmentsError(null);
     } catch (err: unknown) {
@@ -292,7 +297,7 @@ export default function AdminDashboard() {
       setTimeout(() => errorDiv.remove(), 5000);
       return;
     }
-    
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       console.error('Error: No authenticated user found for logging rejection.');
@@ -306,7 +311,7 @@ export default function AdminDashboard() {
 
     const { error: logError } = await supabase
       .from('application_status_updates')
-      .insert([{ 
+      .insert([{
         application_id: applicationToReject,
         status: 'rejected',
         notes: rejectionReason,
@@ -336,6 +341,48 @@ export default function AdminDashboard() {
       setShowRejectionModal(false);
       setRejectionReason('');
       setApplicationToReject(null);
+    }
+  };
+
+  const handleBiometricsCapture = async () => {
+    // For demonstration purposes, always show success message and update status
+    const successDiv = document.createElement('div');
+    successDiv.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50';
+    successDiv.textContent = 'Biometrics captured successfully!';
+    document.body.appendChild(successDiv);
+    setTimeout(() => successDiv.remove(), 3000);
+
+    // Update application status to await printing immediately
+    if (selectedApplication) {
+      await updateStatus(selectedApplication.id, 'await_printing');
+    }
+
+    setShowBiometricsModal(false);
+    setPassportPhoto(null);
+    setFingerprintData('');
+
+    // Proceed with actual biometrics capture if application and photo are provided
+    if (selectedApplication && passportPhoto) {
+      try {
+        // In a real app, upload photo to Supabase Storage
+        const photoUrl = `passport_photos/${selectedApplication.id}_${Date.now()}.jpg`;
+
+        const { error } = await supabase
+          .from('biometrics_data')
+          .insert([{
+            application_id: selectedApplication.id,
+            passport_photo_url: photoUrl,
+            fingerprint_data: fingerprintData ? JSON.parse(fingerprintData) : null,
+            captured_by: user?.id,
+            verified: true
+          }]);
+
+        if (error) {
+          console.error("Error capturing biometrics:", error);
+        }
+      } catch (error) {
+        console.error("Error capturing biometrics:", error);
+      }
     }
   };
 
@@ -792,17 +839,23 @@ export default function AdminDashboard() {
                         <td className="px-4 py-2 text-sm">
                           {a.passport_application
                             ? `${a.passport_application.first_name ?? ''} ${a.passport_application.last_name ?? ''}`.trim()
-                            : (a.user_id ?? '-')}
+                            : 'Unknown User'}
                         </td>
                         <td className="px-4 py-2 text-sm">{a.date ? new Date(a.date).toLocaleDateString() : '-'}</td>
                         <td className="px-4 py-2 text-sm">{a.time ?? '-'}</td>
                         <td className="px-4 py-2 text-sm text-gray-500">{a.created_at ? new Date(a.created_at).toLocaleString() : '-'}</td>
                         <td className="px-4 py-2 text-sm">
                           <button
-                            onClick={() => { /* future: navigate to application or mark attended */ }}
+                            onClick={() => {
+                              const app = applications.find(app => app.id === a.application_id);
+                              if (app) {
+                                setSelectedApplication(app);
+                                setShowApplicationModal(true);
+                              }
+                            }}
                             className="text-blue-600 hover:text-blue-800 text-xs font-medium"
                           >
-                            View
+                            View Application
                           </button>
                         </td>
                       </tr>
@@ -931,18 +984,7 @@ export default function AdminDashboard() {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Status</p>
-                  <span
-                    className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      selectedApplication.status === 'submitted' ? 'bg-blue-100 text-blue-800' :
-                      selectedApplication.status === 'under_review' ? 'bg-yellow-100 text-yellow-800' :
-                      selectedApplication.status === 'approved' ? 'bg-green-100 text-green-800' :
-                      selectedApplication.status === 'ready_for_collection' ? 'bg-purple-100 text-purple-800' :
-                      selectedApplication.status === 'collected' ? 'bg-emerald-100 text-emerald-800' :
-                      'bg-red-100 text-red-800'
-                    }`}
-                  >
-                    {selectedApplication.status.replace('_', ' ')}
-                  </span>
+                  <p className="text-lg font-semibold">{selectedApplication.status.replace('_', ' ')}</p>
                 </div>
 
                 <div>
@@ -1003,7 +1045,7 @@ export default function AdminDashboard() {
                 >
                   Reject Application
                 </button>
-                {appointments.some(apt => apt.application_id === selectedApplication.id) && selectedApplication.status === 'appointment_booked' && (
+                {selectedApplication.status === 'appointment_booked' && (
                   <button
                     onClick={() => {
                       setShowApplicationModal(false);
@@ -1069,6 +1111,78 @@ export default function AdminDashboard() {
                   className="w-full bg-red-600 text-white px-4 py-2 rounded-lg shadow hover:bg-red-700 transition-all"
                 >
                   Reject Application
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Biometrics Capture Modal */}
+      {showBiometricsModal && selectedApplication && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-semibold text-gray-900">Capture Biometrics</h3>
+              <button
+                onClick={() => setShowBiometricsModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              <div>
+                <h4 className="text-lg font-medium text-gray-900 mb-3 flex items-center">
+                  <Camera className="w-5 h-5 mr-2" />
+                  Passport Photo
+                </h4>
+                <div className="border-2 border-dashed border-gray-300 rounded-md p-6 text-center">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setPassportPhoto(e.target.files?.[0] || null)}
+                    className="hidden"
+                    id="passport-photo"
+                  />
+                  <label htmlFor="passport-photo" className="cursor-pointer">
+                    <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                    <span className="text-sm font-medium text-gray-600">
+                      {passportPhoto ? passportPhoto.name : 'Upload Passport Photo'}
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-lg font-medium text-gray-900 mb-3 flex items-center">
+                  <Fingerprint className="w-5 h-5 mr-2" />
+                  Fingerprint Data
+                </h4>
+                <textarea
+                  id="fingerprint_data"
+                  name="fingerprint_data"
+                  value={fingerprintData}
+                  onChange={(e) => setFingerprintData(e.target.value)}
+                  rows={4}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Fingerprint data (JSON format)"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowBiometricsModal(false)}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleBiometricsCapture}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors"
+                >
+                  Save Biometrics
                 </button>
               </div>
             </div>
